@@ -19,11 +19,11 @@ SENDER_EMAIL = "rajgopalr.padget@dixoninfo.com"
 SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 
 # Email recipients
-RECIPIENT_EMAILS = ["rajgopal.padget@dixoninfo.com"]
+RECIPIENT_EMAILS = ["emurugesan.padget@dixoninfo.com"]
 
 # Auto email settings
-AUTO_EMAIL_HOUR = 10  # Set to 10 AM
-AUTO_EMAIL_MINUTE = 30  # Set to 20 minutes
+AUTO_EMAIL_HOUR = 12  # Set to 09 AM
+AUTO_EMAIL_MINUTE = 00  # Set to 00 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
