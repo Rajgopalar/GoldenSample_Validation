@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import warnings
 import time
-import threading
 warnings.filterwarnings('ignore')
 
 # ========== CONFIGURATION ==========
@@ -23,13 +22,13 @@ SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 PRIMARY_RECIPIENT = "emurugesan.padget@dixoninfo.com"  # Main recipient (To field)
 CC_RECIPIENTS = [
     "chauhandeesingh@gmail.com",
+    "rajgopal.padget@dixoninfo.com",
     # Add more CC recipients here
-    # "another.email@dixoninfo.com",
 ]
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 12  # Set to 12 PM
-AUTO_EMAIL_MINUTE = 26  # Set to 00 minutes
+AUTO_EMAIL_MINUTE = 26  # Set to 26 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
@@ -74,6 +73,11 @@ st.markdown("""
         margin-top: 10px;
         font-size: 12px;
     }
+    .auto-email-status {
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -82,12 +86,12 @@ if 'last_auto_email_date' not in st.session_state:
     st.session_state.last_auto_email_date = None
 if 'auto_email_sent_today' not in st.session_state:
     st.session_state.auto_email_sent_today = False
-if 'email_thread_started' not in st.session_state:
-    st.session_state.email_thread_started = False
 if 'primary_recipient' not in st.session_state:
     st.session_state.primary_recipient = PRIMARY_RECIPIENT
 if 'cc_recipients' not in st.session_state:
     st.session_state.cc_recipients = CC_RECIPIENTS.copy()
+if 'last_check_time' not in st.session_state:
+    st.session_state.last_check_time = None
 
 def parse_date_safe(date_str):
     """Safely parse date from various formats"""
@@ -386,60 +390,48 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
     
     return html
 
-def background_email_checker():
-    """Background thread to check and send auto emails"""
-    while True:
-        try:
-            now = datetime.now()
-            current_hour = now.hour
-            current_minute = now.minute
+def check_and_send_auto_email():
+    """Check if auto email should be sent and send it"""
+    if not AUTO_EMAIL_ENABLED:
+        return False, "Auto email disabled"
+    
+    now = datetime.now()
+    current_hour = now.hour
+    current_minute = now.minute
+    current_date = now.date()
+    
+    # Get the last sent date
+    last_sent_date = st.session_state.last_auto_email_date.date() if st.session_state.last_auto_email_date else None
+    
+    # Check if it's time to send email and not sent today
+    if (current_hour == AUTO_EMAIL_HOUR and 
+        current_minute == AUTO_EMAIL_MINUTE and 
+        (last_sent_date != current_date)):
+        
+        if 'df' in st.session_state and st.session_state.df is not None:
+            df = st.session_state.df
+            due_records = get_due_records(df)
+            overdue_records = get_overdue_records(df)
             
-            # Check if it's time to send email
-            if (current_hour == AUTO_EMAIL_HOUR and 
-                current_minute == AUTO_EMAIL_MINUTE and 
-                AUTO_EMAIL_ENABLED and
-                not st.session_state.auto_email_sent_today):
-                
-                # Send email
-                if 'df' in st.session_state and st.session_state.df is not None:
-                    df = st.session_state.df
-                    due_records = get_due_records(df)
-                    overdue_records = get_overdue_records(df)
-                    
-                    if not due_records.empty or not overdue_records.empty:
-                        success, message = send_single_email_alert(
-                            df, 
-                            st.session_state.primary_recipient, 
-                            st.session_state.cc_recipients, 
-                            alert_type="auto"
-                        )
-                        if success:
-                            st.session_state.last_auto_email_date = now
-                            st.session_state.auto_email_sent_today = True
-                            print(f"✅ Auto email sent successfully at {now}")
-                        else:
-                            print(f"❌ Auto email failed: {message}")
-                    else:
-                        print("No urgent samples found, skipping auto email")
-            
-            # Reset the flag at midnight (new day)
-            if current_hour == 0 and current_minute == 0:
-                st.session_state.auto_email_sent_today = False
-            
-            # Wait for 60 seconds before next check
-            time.sleep(60)
-            
-        except Exception as e:
-            print(f"Background email checker error: {e}")
-            time.sleep(60)
-
-def start_background_thread():
-    """Start the background email checking thread"""
-    if not st.session_state.email_thread_started:
-        thread = threading.Thread(target=background_email_checker, daemon=True)
-        thread.start()
-        st.session_state.email_thread_started = True
-        st.session_state.background_thread = thread
+            if not due_records.empty or not overdue_records.empty:
+                success, message = send_single_email_alert(
+                    df, 
+                    st.session_state.primary_recipient, 
+                    st.session_state.cc_recipients, 
+                    alert_type="auto"
+                )
+                if success:
+                    st.session_state.last_auto_email_date = now
+                    st.session_state.auto_email_sent_today = True
+                    return True, f"✅ Auto email sent successfully at {now.strftime('%H:%M:%S')} to {st.session_state.primary_recipient} and {len(st.session_state.cc_recipients)} CC recipients"
+                else:
+                    return False, f"❌ Auto email failed: {message}"
+            else:
+                return False, "No urgent samples found, skipping auto email"
+        else:
+            return False, "No data available"
+    
+    return False, "Not time yet"
 
 def create_status_chart(df):
     """Create donut chart for status distribution"""
@@ -526,9 +518,6 @@ def create_urgency_chart(df):
     return fig
 
 def main():
-    # Start background thread for auto emails
-    start_background_thread()
-    
     # Header
     st.markdown('<div class="main-header"><h1 style="color:white; text-align:center;">📊 Golden Sample Revalidation Tracker</h1></div>', unsafe_allow_html=True)
     
@@ -537,7 +526,7 @@ def main():
         st.header("⚙️ Controls")
         
         # Auto-refresh option
-        auto_refresh = st.checkbox("🔄 Auto-refresh data", value=False)
+        auto_refresh = st.checkbox("🔄 Auto-refresh data", value=True)  # Enable by default
         if auto_refresh:
             refresh_rate = st.slider("Refresh rate (seconds)", 30, 300, 60)
             st.info(f"Data will refresh every {refresh_rate} seconds")
@@ -551,16 +540,34 @@ def main():
         st.subheader("🤖 Auto Email Settings")
         st.info(f"📨 Auto emails scheduled daily at {AUTO_EMAIL_HOUR:02d}:{AUTO_EMAIL_MINUTE:02d}")
         
+        # Show current time
+        current_time = datetime.now()
+        st.caption(f"Current time: {current_time.strftime('%H:%M:%S')}")
+        
+        # Check and send auto email on each page load
+        auto_email_sent, auto_email_message = check_and_send_auto_email()
+        
         # Show auto email status
         if st.session_state.last_auto_email_date:
             st.success(f"✅ Last auto email: {st.session_state.last_auto_email_date.strftime('%d-%m-%Y %H:%M:%S')}")
-        else:
-            st.info("⏰ No auto email sent yet today")
         
+        # Show today's status
         if st.session_state.auto_email_sent_today:
             st.success("✅ Auto email already sent today")
         else:
-            st.info("⏰ Waiting for scheduled time...")
+            next_time = datetime.now().replace(hour=AUTO_EMAIL_HOUR, minute=AUTO_EMAIL_MINUTE, second=0)
+            if next_time < datetime.now():
+                next_time += timedelta(days=1)
+            time_until = next_time - datetime.now()
+            hours = time_until.seconds // 3600
+            minutes = (time_until.seconds % 3600) // 60
+            st.info(f"⏰ Next auto email in: {hours}h {minutes}m")
+        
+        # Show last check result if any
+        if auto_email_sent:
+            st.success(auto_email_message)
+        elif auto_email_message and auto_email_message != "Not time yet":
+            st.warning(auto_email_message)
         
         st.markdown("---")
         
@@ -589,20 +596,20 @@ def main():
         # Add new CC recipient
         st.markdown("**Add CC Recipient:**")
         new_cc = st.text_input("CC Email", key="new_cc_recipient")
-        if st.button("➕ Add CC Recipient", use_container_width=True):
-            if new_cc and new_cc.strip():
-                if new_cc not in st.session_state.cc_recipients:
-                    st.session_state.cc_recipients.append(new_cc.strip())
-                    st.success(f"Added {new_cc} to CC list")
-                    st.rerun()
-                else:
-                    st.warning("Email already in CC list")
-            else:
-                st.warning("Please enter a valid email")
-        
-        # Reset to default button
         col1, col2 = st.columns(2)
         with col1:
+            if st.button("➕ Add CC Recipient", use_container_width=True):
+                if new_cc and new_cc.strip():
+                    if new_cc not in st.session_state.cc_recipients:
+                        st.session_state.cc_recipients.append(new_cc.strip())
+                        st.success(f"Added {new_cc} to CC list")
+                        st.rerun()
+                    else:
+                        st.warning("Email already in CC list")
+                else:
+                    st.warning("Please enter a valid email")
+        
+        with col2:
             if st.button("🔄 Reset to Default", use_container_width=True):
                 st.session_state.primary_recipient = PRIMARY_RECIPIENT
                 st.session_state.cc_recipients = CC_RECIPIENTS.copy()
@@ -612,8 +619,8 @@ def main():
         # Show recipient summary
         st.markdown("---")
         st.markdown("**Recipient Summary:**")
-        st.caption(f"TO: {st.session_state.primary_recipient}")
-        st.caption(f"CC: {len(st.session_state.cc_recipients)} recipient(s)")
+        st.caption(f"📧 TO: {st.session_state.primary_recipient}")
+        st.caption(f"👥 CC: {len(st.session_state.cc_recipients)} recipient(s)")
         
         st.markdown("---")
         
@@ -683,6 +690,7 @@ def main():
                 st.write(f"Primary (TO): {st.session_state.primary_recipient}")
                 st.write(f"CC Recipients: {st.session_state.cc_recipients}")
                 st.write(f"Auto email sent today: {st.session_state.auto_email_sent_today}")
+                st.write(f"Last auto email date: {st.session_state.last_auto_email_date}")
         
         # Metrics Row
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -813,7 +821,7 @@ def main():
                 key="download_csv"
             )
         
-        # Auto-refresh logic
+        # Auto-refresh logic - this ensures the page reloads and checks for auto email
         if auto_refresh:
             time.sleep(refresh_rate)
             st.rerun()
