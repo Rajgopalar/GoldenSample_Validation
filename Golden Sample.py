@@ -28,7 +28,7 @@ CC_RECIPIENTS = [
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 15       # 24-hr format
-AUTO_EMAIL_MINUTE = 25
+AUTO_EMAIL_MINUTE = 26
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
