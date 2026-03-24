@@ -27,7 +27,7 @@ CC_RECIPIENTS = [
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 12  # Set to 12 PM
-AUTO_EMAIL_MINUTE = 36  # Set to 26 minutes
+AUTO_EMAIL_MINUTE = 38  # Set to 26 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
