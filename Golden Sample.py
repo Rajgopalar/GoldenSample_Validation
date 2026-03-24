@@ -18,12 +18,19 @@ SMTP_PORT = 587
 SENDER_EMAIL = "rajgopalr.padget@dixoninfo.com"
 SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 
-# Email recipients
-RECIPIENT_EMAILS = ["emurugesan.padget@dixoninfo.com"]
+# Email recipients - Add multiple email addresses here
+# Format: ["email1@domain.com", "email2@domain.com", "email3@domain.com"]
+DEFAULT_RECIPIENT_EMAILS = [
+    "emurugesan.padget@dixoninfo.com",
+    "rajgopal.padget@dixoninfo.com",  # Keep old for backup if needed
+    # Add more email addresses here
+    # "recipient3@dixoninfo.com",
+    # "recipient4@dixoninfo.com",
+]
 
 # Auto email settings
-AUTO_EMAIL_HOUR = 12  # Set to 09 AM
-AUTO_EMAIL_MINUTE = 00  # Set to 00 minutes
+AUTO_EMAIL_HOUR = 12  # Set to 12 PM
+AUTO_EMAIL_MINUTE = 0  # Set to 00 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
@@ -61,6 +68,13 @@ st.markdown("""
         margin: 1rem 0;
         border-radius: 5px;
     }
+    .recipient-list {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 10px;
+        font-size: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -69,6 +83,8 @@ if 'last_auto_email_date' not in st.session_state:
     st.session_state.last_auto_email_date = None
 if 'auto_email_sent_today' not in st.session_state:
     st.session_state.auto_email_sent_today = False
+if 'recipient_emails' not in st.session_state:
+    st.session_state.recipient_emails = DEFAULT_RECIPIENT_EMAILS.copy()
 
 def parse_date_safe(date_str):
     """Safely parse date from various formats"""
@@ -214,24 +230,32 @@ def get_overdue_records(df):
     return df[mask]
 
 def send_email_alert(df, recipient_emails, alert_type="manual"):
-    """Send email alert for due records"""
+    """Send email alert for due records to multiple recipients"""
     due_records = get_due_records(df)
     overdue_records = get_overdue_records(df)
     
     if due_records.empty and overdue_records.empty:
         return False, "No records requiring immediate attention"
     
+    # Ensure recipient_emails is a list
+    if isinstance(recipient_emails, str):
+        recipient_list = [recipient_emails]
+    else:
+        recipient_list = recipient_emails
+    
+    # Remove any empty strings or None values
+    recipient_list = [r for r in recipient_list if r and r.strip()]
+    
+    if not recipient_list:
+        return False, "No valid recipient email addresses provided"
+    
     try:
         # Create email body
         email_body = generate_email_html(df, due_records, overdue_records, alert_type)
         
-        # Convert to list if single string
-        if isinstance(recipient_emails, str):
-            recipient_list = [recipient_emails]
-        else:
-            recipient_list = recipient_emails
-        
         success_count = 0
+        failed_recipients = []
+        
         for recipient in recipient_list:
             try:
                 msg = MIMEMultipart()
@@ -239,6 +263,7 @@ def send_email_alert(df, recipient_emails, alert_type="manual"):
                 msg['To'] = recipient
                 total_urgent = len(due_records) + len(overdue_records)
                 msg['Subject'] = f"🚨 GOLDEN SAMPLE ALERT: {total_urgent} {'Samples' if total_urgent > 1 else 'Sample'} Need Immediate Attention"
+                msg['CC'] = SENDER_EMAIL  # Send a copy to sender for tracking
                 
                 msg.attach(MIMEText(email_body, 'html'))
                 
@@ -248,10 +273,18 @@ def send_email_alert(df, recipient_emails, alert_type="manual"):
                     server.send_message(msg)
                 
                 success_count += 1
+                
             except Exception as e:
+                failed_recipients.append(f"{recipient}: {str(e)}")
                 print(f"Failed to send to {recipient}: {e}")
         
-        return True, f"Alert sent to {success_count} recipient(s)"
+        if success_count > 0:
+            message = f"Alert sent to {success_count} of {len(recipient_list)} recipient(s)"
+            if failed_recipients:
+                message += f"\nFailed: {', '.join(failed_recipients)}"
+            return True, message
+        else:
+            return False, f"Failed to send to all recipients: {', '.join(failed_recipients)}"
     
     except Exception as e:
         return False, f"Email failed: {e}"
@@ -273,7 +306,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                 <td><b>{row.get('Staus', '')}</b></td>
                 <td>{row.get('Incharge', '')}</td>
                 <td style="color:#dc3545;">⚠️ URGENT</td>
-             </tr>
+              </tr>
             """
     
     # Generate overdue records table
@@ -290,7 +323,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                 <td><b>{row.get('Staus', '')}</b></td>
                 <td>{row.get('Incharge', '')}</td>
                 <td style="color:#dc3545;">🔴 OVERDUE</td>
-             </tr>
+              </tr>
             """
     
     total_urgent = len(due_records) + len(overdue_records)
@@ -332,7 +365,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                     <th>Current Status</th>
                     <th>Incharge</th>
                     <th>Alert</th>
-                 </tr>
+                </tr>
             </thead>
             <tbody>
                 {overdue_rows if overdue_rows else '<tr><td colspan="7" style="text-align:center;">No overdue samples</td></tr>'}
@@ -350,7 +383,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                     <th>Current Status</th>
                     <th>Incharge</th>
                     <th>Alert</th>
-                 </tr>
+                </tr>
             </thead>
             <tbody>
                 {due_rows if due_rows else '<tr><td colspan="7" style="text-align:center;">No samples due within 3 days</td></tr>'}
@@ -391,11 +424,12 @@ def check_and_send_auto_email():
                     overdue_records = get_overdue_records(df)
                     
                     if not due_records.empty or not overdue_records.empty:
-                        success, message = send_email_alert(df, RECIPIENT_EMAILS, alert_type="auto")
+                        # Use the current recipient list from session state
+                        success, message = send_email_alert(df, st.session_state.recipient_emails, alert_type="auto")
                         if success:
                             st.session_state.last_auto_email_date = now
                             st.session_state.auto_email_sent_today = True
-                            st.success(f"✅ Auto email sent successfully at {now.strftime('%H:%M:%S')}")
+                            st.success(f"✅ Auto email sent successfully at {now.strftime('%H:%M:%S')} to {len(st.session_state.recipient_emails)} recipient(s)")
                         else:
                             st.error(f"❌ Auto email failed: {message}")
                     else:
@@ -522,23 +556,82 @@ def main():
         
         st.markdown("---")
         
+        # Recipient Management
+        st.subheader("👥 Email Recipients")
+        st.markdown("Manage recipients for both manual and auto alerts:")
+        
+        # Display current recipients
+        st.markdown("**Current Recipients:**")
+        for i, email in enumerate(st.session_state.recipient_emails):
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.text(f"{i+1}. {email}")
+            with col2:
+                if st.button(f"❌", key=f"remove_{i}"):
+                    st.session_state.recipient_emails.pop(i)
+                    st.rerun()
+        
+        # Add new recipient
+        st.markdown("**Add New Recipient:**")
+        new_recipient = st.text_input("Email address", key="new_recipient")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("➕ Add Recipient", use_container_width=True):
+                if new_recipient and new_recipient.strip():
+                    if new_recipient not in st.session_state.recipient_emails:
+                        st.session_state.recipient_emails.append(new_recipient.strip())
+                        st.success(f"Added {new_recipient}")
+                        st.rerun()
+                    else:
+                        st.warning("Email already in list")
+                else:
+                    st.warning("Please enter a valid email")
+        
+        with col2:
+            if st.button("🔄 Reset to Default", use_container_width=True):
+                st.session_state.recipient_emails = DEFAULT_RECIPIENT_EMAILS.copy()
+                st.success("Reset to default recipients")
+                st.rerun()
+        
+        # Show recipient count
+        st.caption(f"Total recipients: {len(st.session_state.recipient_emails)}")
+        
+        st.markdown("---")
+        
         # Manual email
         st.subheader("📧 Manual Email Alert")
-        manual_recipient = st.text_input("Recipient Email", 
-                                        value="rajgopal.padget@dixoninfo.com")
+        
+        # Option to send to all or specific recipients
+        send_to_all = st.checkbox("Send to all recipients", value=True)
+        
+        if not send_to_all:
+            # Allow selecting specific recipients
+            selected_recipients = st.multiselect(
+                "Select recipients",
+                options=st.session_state.recipient_emails,
+                default=st.session_state.recipient_emails[:1] if st.session_state.recipient_emails else []
+            )
+        else:
+            selected_recipients = st.session_state.recipient_emails
+        
+        # Display selected recipients
+        if selected_recipients:
+            st.info(f"Will send to: {', '.join(selected_recipients)}")
+        else:
+            st.warning("No recipients selected")
         
         col1, col2 = st.columns(2)
         with col1:
-            send_email = st.button("🚨 Send Alert Now", type="primary", use_container_width=True)
+            send_email = st.button("🚨 Send Alert Now", type="primary", use_container_width=True, disabled=not selected_recipients)
         with col2:
             if st.button("🔄 Refresh Data", use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
         
-        if send_email and manual_recipient:
-            with st.spinner("Sending alert..."):
+        if send_email and selected_recipients:
+            with st.spinner(f"Sending alert to {len(selected_recipients)} recipient(s)..."):
                 if 'df' in st.session_state and st.session_state.df is not None:
-                    success, message = send_email_alert(st.session_state.df, manual_recipient)
+                    success, message = send_email_alert(st.session_state.df, selected_recipients, alert_type="manual")
                     if success:
                         st.success(message)
                     else:
@@ -584,6 +677,8 @@ def main():
                 st.dataframe(df.head(3))
                 st.write("Data types:")
                 st.write(df.dtypes)
+                st.write("Recipients in session state:")
+                st.write(st.session_state.recipient_emails)
         
         # Metrics Row
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -718,8 +813,8 @@ def main():
         
         with col2:
             if st.button("📧 Send Alert to All", use_container_width=True):
-                with st.spinner("Sending alerts..."):
-                    success, message = send_email_alert(df, RECIPIENT_EMAILS, alert_type="manual")
+                with st.spinner(f"Sending alerts to {len(st.session_state.recipient_emails)} recipient(s)..."):
+                    success, message = send_email_alert(df, st.session_state.recipient_emails, alert_type="manual")
                     if success:
                         st.success(message)
                     else:
