@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import warnings
 import time
+import threading
 warnings.filterwarnings('ignore')
 
 # ========== CONFIGURATION ==========
@@ -18,19 +19,17 @@ SMTP_PORT = 587
 SENDER_EMAIL = "rajgopalr.padget@dixoninfo.com"
 SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 
-# Email recipients - Add multiple email addresses here
-# Format: ["email1@domain.com", "email2@domain.com", "email3@domain.com"]
-DEFAULT_RECIPIENT_EMAILS = [
-    "emurugesan.padget@dixoninfo.com",
-    "rajgopal.padget@dixoninfo.com",  # Keep old for backup if needed
-    # Add more email addresses here
-    # "recipient3@dixoninfo.com",
-    # "recipient4@dixoninfo.com",
+# Email recipients configuration
+PRIMARY_RECIPIENT = "emurugesan.padget@dixoninfo.com"  # Main recipient (To field)
+CC_RECIPIENTS = [
+    "chauhandeesingh@gmail.com",
+    # Add more CC recipients here
+    # "another.email@dixoninfo.com",
 ]
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 12  # Set to 12 PM
-AUTO_EMAIL_MINUTE = 16  # Set to 00 minutes
+AUTO_EMAIL_MINUTE = 0  # Set to 00 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
@@ -83,8 +82,12 @@ if 'last_auto_email_date' not in st.session_state:
     st.session_state.last_auto_email_date = None
 if 'auto_email_sent_today' not in st.session_state:
     st.session_state.auto_email_sent_today = False
-if 'recipient_emails' not in st.session_state:
-    st.session_state.recipient_emails = DEFAULT_RECIPIENT_EMAILS.copy()
+if 'email_thread_started' not in st.session_state:
+    st.session_state.email_thread_started = False
+if 'primary_recipient' not in st.session_state:
+    st.session_state.primary_recipient = PRIMARY_RECIPIENT
+if 'cc_recipients' not in st.session_state:
+    st.session_state.cc_recipients = CC_RECIPIENTS.copy()
 
 def parse_date_safe(date_str):
     """Safely parse date from various formats"""
@@ -229,62 +232,41 @@ def get_overdue_records(df):
     mask = (df['Days Left'] < 0) & (df['Staus'].str.lower() != 'ok')
     return df[mask]
 
-def send_email_alert(df, recipient_emails, alert_type="manual"):
-    """Send email alert for due records to multiple recipients"""
+def send_single_email_alert(df, primary_recipient, cc_recipients, alert_type="manual"):
+    """Send a single email with primary in TO and others in CC"""
     due_records = get_due_records(df)
     overdue_records = get_overdue_records(df)
     
     if due_records.empty and overdue_records.empty:
         return False, "No records requiring immediate attention"
     
-    # Ensure recipient_emails is a list
-    if isinstance(recipient_emails, str):
-        recipient_list = [recipient_emails]
-    else:
-        recipient_list = recipient_emails
-    
-    # Remove any empty strings or None values
-    recipient_list = [r for r in recipient_list if r and r.strip()]
-    
-    if not recipient_list:
-        return False, "No valid recipient email addresses provided"
+    # Filter out empty/invalid emails
+    cc_list = [email for email in cc_recipients if email and email.strip()]
     
     try:
         # Create email body
         email_body = generate_email_html(df, due_records, overdue_records, alert_type)
         
-        success_count = 0
-        failed_recipients = []
+        msg = MIMEMultipart()
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = primary_recipient
+        if cc_list:
+            msg['Cc'] = ', '.join(cc_list)
         
-        for recipient in recipient_list:
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = SENDER_EMAIL
-                msg['To'] = recipient
-                total_urgent = len(due_records) + len(overdue_records)
-                msg['Subject'] = f"🚨 GOLDEN SAMPLE ALERT: {total_urgent} {'Samples' if total_urgent > 1 else 'Sample'} Need Immediate Attention"
-                msg['CC'] = SENDER_EMAIL  # Send a copy to sender for tracking
-                
-                msg.attach(MIMEText(email_body, 'html'))
-                
-                with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-                    server.starttls()
-                    server.login(SENDER_EMAIL, SENDER_PASSWORD)
-                    server.send_message(msg)
-                
-                success_count += 1
-                
-            except Exception as e:
-                failed_recipients.append(f"{recipient}: {str(e)}")
-                print(f"Failed to send to {recipient}: {e}")
+        total_urgent = len(due_records) + len(overdue_records)
+        msg['Subject'] = f"🚨 GOLDEN SAMPLE ALERT: {total_urgent} {'Samples' if total_urgent > 1 else 'Sample'} Need Immediate Attention"
         
-        if success_count > 0:
-            message = f"Alert sent to {success_count} of {len(recipient_list)} recipient(s)"
-            if failed_recipients:
-                message += f"\nFailed: {', '.join(failed_recipients)}"
-            return True, message
-        else:
-            return False, f"Failed to send to all recipients: {', '.join(failed_recipients)}"
+        msg.attach(MIMEText(email_body, 'html'))
+        
+        # Create recipient list for sending (To + CC)
+        all_recipients = [primary_recipient] + cc_list
+        
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+        
+        return True, f"Alert sent to {primary_recipient} (To) and {len(cc_list)} CC recipient(s)"
     
     except Exception as e:
         return False, f"Email failed: {e}"
@@ -365,7 +347,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                     <th>Current Status</th>
                     <th>Incharge</th>
                     <th>Alert</th>
-                </tr>
+                 </tr>
             </thead>
             <tbody>
                 {overdue_rows if overdue_rows else '<tr><td colspan="7" style="text-align:center;">No overdue samples</td></tr>'}
@@ -383,7 +365,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
                     <th>Current Status</th>
                     <th>Incharge</th>
                     <th>Alert</th>
-                </tr>
+                 </tr>
             </thead>
             <tbody>
                 {due_rows if due_rows else '<tr><td colspan="7" style="text-align:center;">No samples due within 3 days</td></tr>'}
@@ -404,40 +386,60 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
     
     return html
 
-def check_and_send_auto_email():
-    """Check if auto email should be sent and send it"""
-    if not AUTO_EMAIL_ENABLED:
-        return
-    
-    now = datetime.now()
-    current_hour = now.hour
-    current_minute = now.minute
-    
-    # Check if it's time to send email
-    if current_hour == AUTO_EMAIL_HOUR and current_minute == AUTO_EMAIL_MINUTE:
-        # Check if email hasn't been sent today
-        if not st.session_state.auto_email_sent_today:
-            with st.spinner("Sending auto email..."):
+def background_email_checker():
+    """Background thread to check and send auto emails"""
+    while True:
+        try:
+            now = datetime.now()
+            current_hour = now.hour
+            current_minute = now.minute
+            
+            # Check if it's time to send email
+            if (current_hour == AUTO_EMAIL_HOUR and 
+                current_minute == AUTO_EMAIL_MINUTE and 
+                AUTO_EMAIL_ENABLED and
+                not st.session_state.auto_email_sent_today):
+                
+                # Send email
                 if 'df' in st.session_state and st.session_state.df is not None:
                     df = st.session_state.df
                     due_records = get_due_records(df)
                     overdue_records = get_overdue_records(df)
                     
                     if not due_records.empty or not overdue_records.empty:
-                        # Use the current recipient list from session state
-                        success, message = send_email_alert(df, st.session_state.recipient_emails, alert_type="auto")
+                        success, message = send_single_email_alert(
+                            df, 
+                            st.session_state.primary_recipient, 
+                            st.session_state.cc_recipients, 
+                            alert_type="auto"
+                        )
                         if success:
                             st.session_state.last_auto_email_date = now
                             st.session_state.auto_email_sent_today = True
-                            st.success(f"✅ Auto email sent successfully at {now.strftime('%H:%M:%S')} to {len(st.session_state.recipient_emails)} recipient(s)")
+                            print(f"✅ Auto email sent successfully at {now}")
                         else:
-                            st.error(f"❌ Auto email failed: {message}")
+                            print(f"❌ Auto email failed: {message}")
                     else:
-                        st.info("No urgent samples found, skipping auto email")
-    
-    # Reset the flag at midnight (new day)
-    if current_hour == 0 and current_minute == 0:
-        st.session_state.auto_email_sent_today = False
+                        print("No urgent samples found, skipping auto email")
+            
+            # Reset the flag at midnight (new day)
+            if current_hour == 0 and current_minute == 0:
+                st.session_state.auto_email_sent_today = False
+            
+            # Wait for 60 seconds before next check
+            time.sleep(60)
+            
+        except Exception as e:
+            print(f"Background email checker error: {e}")
+            time.sleep(60)
+
+def start_background_thread():
+    """Start the background email checking thread"""
+    if not st.session_state.email_thread_started:
+        thread = threading.Thread(target=background_email_checker, daemon=True)
+        thread.start()
+        st.session_state.email_thread_started = True
+        st.session_state.background_thread = thread
 
 def create_status_chart(df):
     """Create donut chart for status distribution"""
@@ -524,6 +526,9 @@ def create_urgency_chart(df):
     return fig
 
 def main():
+    # Start background thread for auto emails
+    start_background_thread()
+    
     # Header
     st.markdown('<div class="main-header"><h1 style="color:white; text-align:center;">📊 Golden Sample Revalidation Tracker</h1></div>', unsafe_allow_html=True)
     
@@ -541,14 +546,17 @@ def main():
         
         # Email section
         st.header("📧 Email Notifications")
+        
+        # Auto email status
+        st.subheader("🤖 Auto Email Settings")
         st.info(f"📨 Auto emails scheduled daily at {AUTO_EMAIL_HOUR:02d}:{AUTO_EMAIL_MINUTE:02d}")
         
+        # Show auto email status
         if st.session_state.last_auto_email_date:
-            st.success(f"Last auto email: {st.session_state.last_auto_email_date.strftime('%d-%m-%Y %H:%M:%S')}")
+            st.success(f"✅ Last auto email: {st.session_state.last_auto_email_date.strftime('%d-%m-%Y %H:%M:%S')}")
         else:
-            st.info("No auto email sent yet today")
+            st.info("⏰ No auto email sent yet today")
         
-        # Show status of today's auto email
         if st.session_state.auto_email_sent_today:
             st.success("✅ Auto email already sent today")
         else:
@@ -558,80 +566,77 @@ def main():
         
         # Recipient Management
         st.subheader("👥 Email Recipients")
-        st.markdown("Manage recipients for both manual and auto alerts:")
         
-        # Display current recipients
-        st.markdown("**Current Recipients:**")
-        for i, email in enumerate(st.session_state.recipient_emails):
+        # Primary recipient (TO field)
+        st.markdown("**Primary Recipient (TO):**")
+        new_primary = st.text_input("TO Email", value=st.session_state.primary_recipient)
+        if new_primary != st.session_state.primary_recipient:
+            st.session_state.primary_recipient = new_primary
+        
+        # CC Recipients
+        st.markdown("**CC Recipients:**")
+        
+        # Display current CC recipients
+        for i, email in enumerate(st.session_state.cc_recipients):
             col1, col2 = st.columns([4, 1])
             with col1:
                 st.text(f"{i+1}. {email}")
             with col2:
-                if st.button(f"❌", key=f"remove_{i}"):
-                    st.session_state.recipient_emails.pop(i)
+                if st.button(f"❌", key=f"remove_cc_{i}"):
+                    st.session_state.cc_recipients.pop(i)
                     st.rerun()
         
-        # Add new recipient
-        st.markdown("**Add New Recipient:**")
-        new_recipient = st.text_input("Email address", key="new_recipient")
+        # Add new CC recipient
+        st.markdown("**Add CC Recipient:**")
+        new_cc = st.text_input("CC Email", key="new_cc_recipient")
+        if st.button("➕ Add CC Recipient", use_container_width=True):
+            if new_cc and new_cc.strip():
+                if new_cc not in st.session_state.cc_recipients:
+                    st.session_state.cc_recipients.append(new_cc.strip())
+                    st.success(f"Added {new_cc} to CC list")
+                    st.rerun()
+                else:
+                    st.warning("Email already in CC list")
+            else:
+                st.warning("Please enter a valid email")
+        
+        # Reset to default button
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("➕ Add Recipient", use_container_width=True):
-                if new_recipient and new_recipient.strip():
-                    if new_recipient not in st.session_state.recipient_emails:
-                        st.session_state.recipient_emails.append(new_recipient.strip())
-                        st.success(f"Added {new_recipient}")
-                        st.rerun()
-                    else:
-                        st.warning("Email already in list")
-                else:
-                    st.warning("Please enter a valid email")
-        
-        with col2:
             if st.button("🔄 Reset to Default", use_container_width=True):
-                st.session_state.recipient_emails = DEFAULT_RECIPIENT_EMAILS.copy()
+                st.session_state.primary_recipient = PRIMARY_RECIPIENT
+                st.session_state.cc_recipients = CC_RECIPIENTS.copy()
                 st.success("Reset to default recipients")
                 st.rerun()
         
-        # Show recipient count
-        st.caption(f"Total recipients: {len(st.session_state.recipient_emails)}")
+        # Show recipient summary
+        st.markdown("---")
+        st.markdown("**Recipient Summary:**")
+        st.caption(f"TO: {st.session_state.primary_recipient}")
+        st.caption(f"CC: {len(st.session_state.cc_recipients)} recipient(s)")
         
         st.markdown("---")
         
         # Manual email
         st.subheader("📧 Manual Email Alert")
         
-        # Option to send to all or specific recipients
-        send_to_all = st.checkbox("Send to all recipients", value=True)
-        
-        if not send_to_all:
-            # Allow selecting specific recipients
-            selected_recipients = st.multiselect(
-                "Select recipients",
-                options=st.session_state.recipient_emails,
-                default=st.session_state.recipient_emails[:1] if st.session_state.recipient_emails else []
-            )
-        else:
-            selected_recipients = st.session_state.recipient_emails
-        
-        # Display selected recipients
-        if selected_recipients:
-            st.info(f"Will send to: {', '.join(selected_recipients)}")
-        else:
-            st.warning("No recipients selected")
-        
         col1, col2 = st.columns(2)
         with col1:
-            send_email = st.button("🚨 Send Alert Now", type="primary", use_container_width=True, disabled=not selected_recipients)
+            send_email = st.button("🚨 Send Alert Now", type="primary", use_container_width=True)
         with col2:
             if st.button("🔄 Refresh Data", use_container_width=True):
                 st.cache_data.clear()
                 st.rerun()
         
-        if send_email and selected_recipients:
-            with st.spinner(f"Sending alert to {len(selected_recipients)} recipient(s)..."):
+        if send_email:
+            with st.spinner("Sending alert..."):
                 if 'df' in st.session_state and st.session_state.df is not None:
-                    success, message = send_email_alert(st.session_state.df, selected_recipients, alert_type="manual")
+                    success, message = send_single_email_alert(
+                        st.session_state.df,
+                        st.session_state.primary_recipient,
+                        st.session_state.cc_recipients,
+                        alert_type="manual"
+                    )
                     if success:
                         st.success(message)
                     else:
@@ -643,9 +648,6 @@ def main():
         
         # Debug option
         debug_mode = st.checkbox("🔧 Show debug info", value=False)
-    
-    # Check for auto email (run this check periodically)
-    check_and_send_auto_email()
     
     # Main content
     try:
@@ -677,8 +679,10 @@ def main():
                 st.dataframe(df.head(3))
                 st.write("Data types:")
                 st.write(df.dtypes)
-                st.write("Recipients in session state:")
-                st.write(st.session_state.recipient_emails)
+                st.write("Email Configuration:")
+                st.write(f"Primary (TO): {st.session_state.primary_recipient}")
+                st.write(f"CC Recipients: {st.session_state.cc_recipients}")
+                st.write(f"Auto email sent today: {st.session_state.auto_email_sent_today}")
         
         # Metrics Row
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -798,27 +802,16 @@ def main():
         
         st.dataframe(styled_df, use_container_width=True, height=500)
         
-        # Export and email buttons
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📥 Export to CSV", use_container_width=True):
-                csv = display_df.to_csv(index=False)
-                st.download_button(
-                    label="Download CSV",
-                    data=csv,
-                    file_name=f"golden_sample_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv",
-                    key="download_csv"
-                )
-        
-        with col2:
-            if st.button("📧 Send Alert to All", use_container_width=True):
-                with st.spinner(f"Sending alerts to {len(st.session_state.recipient_emails)} recipient(s)..."):
-                    success, message = send_email_alert(df, st.session_state.recipient_emails, alert_type="manual")
-                    if success:
-                        st.success(message)
-                    else:
-                        st.error(message)
+        # Export button
+        if st.button("📥 Export to CSV", use_container_width=True):
+            csv = display_df.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"golden_sample_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                key="download_csv"
+            )
         
         # Auto-refresh logic
         if auto_refresh:
