@@ -29,7 +29,7 @@ CC_RECIPIENTS = [
 ]
 
 # Auto email settings
-AUTO_EMAIL_HOUR = 09
+AUTO_EMAIL_HOUR = 9
 AUTO_EMAIL_MINUTE = 00
 # Fires if current time is within +/- this many minutes of target (handles restarts)
 AUTO_EMAIL_WINDOW_MINUTES = 10
