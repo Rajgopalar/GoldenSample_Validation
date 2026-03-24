@@ -22,12 +22,12 @@ SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 PRIMARY_RECIPIENT = "emurugesan.padget@dixoninfo.com"  # Main recipient (To field)
 CC_RECIPIENTS = [
     "chauhandeesingh@gmail.com",
-    # Add more CC recipients here
+    "rajgopal.padget@dixoninfo.com",
 ]
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 12  # Set to 12 PM
-AUTO_EMAIL_MINUTE = 38  # Set to 26 minutes
+AUTO_EMAIL_MINUTE = 46  # Set to 26 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
@@ -65,13 +65,6 @@ st.markdown("""
         margin: 1rem 0;
         border-radius: 5px;
     }
-    .recipient-list {
-        background-color: #f8f9fa;
-        padding: 10px;
-        border-radius: 5px;
-        margin-top: 10px;
-        font-size: 12px;
-    }
     .auto-email-status {
         padding: 10px;
         border-radius: 5px;
@@ -89,8 +82,8 @@ if 'primary_recipient' not in st.session_state:
     st.session_state.primary_recipient = PRIMARY_RECIPIENT
 if 'cc_recipients' not in st.session_state:
     st.session_state.cc_recipients = CC_RECIPIENTS.copy()
-if 'last_check_time' not in st.session_state:
-    st.session_state.last_check_time = None
+if 'auto_email_log' not in st.session_state:
+    st.session_state.auto_email_log = []
 
 def parse_date_safe(date_str):
     """Safely parse date from various formats"""
@@ -106,16 +99,12 @@ def parse_date_safe(date_str):
             if sep in date_str:
                 parts = date_str.split(sep)
                 if len(parts) == 3:
-                    # Check if it's DD-MM-YYYY format
                     day, month, year = parts
-                    # Validate parts are numbers
                     if day.isdigit() and month.isdigit() and year.isdigit():
-                        # Ensure 4-digit year
                         if len(year) == 2:
                             year = '20' + year
                         return datetime(int(year), int(month), int(day))
         
-        # Try pandas parser as last resort
         return pd.to_datetime(date_str, dayfirst=True, errors='coerce')
         
     except Exception as e:
@@ -137,11 +126,8 @@ def process_data(df):
         return None
 
     df = df.copy()
-    
-    # Standardize column names
     df.columns = df.columns.str.strip()
     
-    # Check if required columns exist
     required_columns = ['Validation Date', 'Staus', 'Model']
     for col in required_columns:
         if col not in df.columns:
@@ -149,10 +135,7 @@ def process_data(df):
             st.write("Available columns:", df.columns.tolist())
             return None
     
-    # Parse validation dates
     df['Validation Date Parsed'] = df['Validation Date'].apply(parse_date_safe)
-    
-    # Drop rows with invalid dates
     initial_count = len(df)
     df = df.dropna(subset=['Validation Date Parsed'])
     
@@ -163,17 +146,10 @@ def process_data(df):
         st.error("No valid dates found. Please check date format (should be DD-MM-YYYY)")
         return None
     
-    # Convert to datetime series
     validation_dates = pd.Series(df['Validation Date Parsed'])
-    
-    # Calculate dates using timedelta
     revalidation_dates = validation_dates + pd.Timedelta(days=10)
-    reminder_dates = revalidation_dates - pd.Timedelta(days=3)
     
-    # Calculate days left
     today = datetime.now().date()
-    
-    # Create a list of days left
     days_left_list = []
     for reval_date in revalidation_dates:
         if pd.notna(reval_date):
@@ -183,25 +159,17 @@ def process_data(df):
             days_left_list.append(None)
     
     df['Days Left'] = days_left_list
-    
-    # Add calculated columns
     df['Validation Date'] = validation_dates
     df['Revalidation Due'] = revalidation_dates
-    df['Reminder Date'] = reminder_dates
-    
-    # Format dates for display
     df['Validation Date Display'] = validation_dates.dt.strftime('%d-%m-%Y')
     df['Revalidation Due Display'] = revalidation_dates.dt.strftime('%d-%m-%Y')
-    df['Reminder Date Display'] = reminder_dates.dt.strftime('%d-%m-%Y')
     
-    # Determine alert status
     def get_alert_status(row):
         days_left = row['Days Left']
         status = str(row.get('Staus', '')).lower()
         
         if pd.isna(days_left):
             return '⚪ Unknown'
-        
         if status == 'ok':
             return '✅ Completed'
         elif days_left < 0:
@@ -222,9 +190,7 @@ def get_due_records(df):
     if df is None or df.empty:
         return pd.DataFrame()
     
-    # Condition: Days Left <= 3 and Days Left >= 0 and status not OK
     mask = (df['Days Left'] <= 3) & (df['Days Left'] >= 0) & (df['Staus'].str.lower() != 'ok')
-    
     return df[mask]
 
 def get_overdue_records(df):
@@ -243,11 +209,9 @@ def send_single_email_alert(df, primary_recipient, cc_recipients, alert_type="ma
     if due_records.empty and overdue_records.empty:
         return False, "No records requiring immediate attention"
     
-    # Filter out empty/invalid emails
     cc_list = [email for email in cc_recipients if email and email.strip()]
     
     try:
-        # Create email body
         email_body = generate_email_html(df, due_records, overdue_records, alert_type)
         
         msg = MIMEMultipart()
@@ -260,9 +224,6 @@ def send_single_email_alert(df, primary_recipient, cc_recipients, alert_type="ma
         msg['Subject'] = f"🚨 GOLDEN SAMPLE ALERT: {total_urgent} {'Samples' if total_urgent > 1 else 'Sample'} Need Immediate Attention"
         
         msg.attach(MIMEText(email_body, 'html'))
-        
-        # Create recipient list for sending (To + CC)
-        all_recipients = [primary_recipient] + cc_list
         
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
@@ -277,7 +238,6 @@ def send_single_email_alert(df, primary_recipient, cc_recipients, alert_type="ma
 def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
     """Generate HTML for email body"""
     
-    # Generate due records table
     due_rows = ""
     if not due_records.empty:
         for _, row in due_records.iterrows():
@@ -294,7 +254,6 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
               </tr>
             """
     
-    # Generate overdue records table
     overdue_rows = ""
     if not overdue_records.empty:
         for _, row in overdue_records.iterrows():
@@ -342,15 +301,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
         <h3>🔴 OVERDUE SAMPLES:</h3>
         <table>
             <thead>
-                <tr>
-                    <th>Model</th>
-                    <th>Validation Date</th>
-                    <th>Revalidation Due</th>
-                    <th>Status</th>
-                    <th>Current Status</th>
-                    <th>Incharge</th>
-                    <th>Alert</th>
-                 </tr>
+                <tr><th>Model</th><th>Validation Date</th><th>Revalidation Due</th><th>Status</th><th>Current Status</th><th>Incharge</th><th>Alert</th></tr>
             </thead>
             <tbody>
                 {overdue_rows if overdue_rows else '<tr><td colspan="7" style="text-align:center;">No overdue samples</td></tr>'}
@@ -360,15 +311,7 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
         <h3>⚠️ SAMPLES DUE WITHIN 3 DAYS:</h3>
         <table>
             <thead>
-                <tr>
-                    <th>Model</th>
-                    <th>Validation Date</th>
-                    <th>Revalidation Due</th>
-                    <th>Days Left</th>
-                    <th>Current Status</th>
-                    <th>Incharge</th>
-                    <th>Alert</th>
-                 </tr>
+                <tr><th>Model</th><th>Validation Date</th><th>Revalidation Due</th><th>Days Left</th><th>Current Status</th><th>Incharge</th><th>Alert</th></tr>
             </thead>
             <tbody>
                 {due_rows if due_rows else '<tr><td colspan="7" style="text-align:center;">No samples due within 3 days</td></tr>'}
@@ -392,25 +335,42 @@ def generate_email_html(df, due_records, overdue_records, alert_type="manual"):
 def check_and_send_auto_email():
     """Check if auto email should be sent and send it"""
     if not AUTO_EMAIL_ENABLED:
-        return False, "Auto email disabled"
+        return False, "Auto email disabled", None
     
     now = datetime.now()
     current_hour = now.hour
     current_minute = now.minute
     current_date = now.date()
     
-    # Get the last sent date
-    last_sent_date = st.session_state.last_auto_email_date.date() if st.session_state.last_auto_email_date else None
+    # Debug log
+    log_entry = {
+        "timestamp": now.strftime('%Y-%m-%d %H:%M:%S'),
+        "current_time": f"{current_hour:02d}:{current_minute:02d}",
+        "scheduled_time": f"{AUTO_EMAIL_HOUR:02d}:{AUTO_EMAIL_MINUTE:02d}",
+        "last_sent_date": str(st.session_state.last_auto_email_date),
+        "auto_email_sent_today": st.session_state.auto_email_sent_today
+    }
     
-    # Check if it's time to send email and not sent today
-    if (current_hour == AUTO_EMAIL_HOUR and 
-        current_minute == AUTO_EMAIL_MINUTE and 
-        (last_sent_date != current_date)):
+    # Check if it's time to send email
+    time_match = (current_hour == AUTO_EMAIL_HOUR and current_minute == AUTO_EMAIL_MINUTE)
+    
+    # Check if not sent today
+    not_sent_today = (st.session_state.last_auto_email_date is None or 
+                     st.session_state.last_auto_email_date.date() != current_date)
+    
+    log_entry["time_match"] = time_match
+    log_entry["not_sent_today"] = not_sent_today
+    
+    if time_match and not_sent_today:
+        log_entry["action"] = "Time matched, attempting to send email"
         
         if 'df' in st.session_state and st.session_state.df is not None:
             df = st.session_state.df
             due_records = get_due_records(df)
             overdue_records = get_overdue_records(df)
+            
+            log_entry["due_records_count"] = len(due_records)
+            log_entry["overdue_records_count"] = len(overdue_records)
             
             if not due_records.empty or not overdue_records.empty:
                 success, message = send_single_email_alert(
@@ -422,15 +382,29 @@ def check_and_send_auto_email():
                 if success:
                     st.session_state.last_auto_email_date = now
                     st.session_state.auto_email_sent_today = True
-                    return True, f"✅ Auto email sent successfully at {now.strftime('%H:%M:%S')} to {st.session_state.primary_recipient} and {len(st.session_state.cc_recipients)} CC recipients"
+                    log_entry["status"] = "SUCCESS"
+                    log_entry["message"] = message
+                    st.session_state.auto_email_log.append(log_entry)
+                    return True, message, log_entry
                 else:
-                    return False, f"❌ Auto email failed: {message}"
+                    log_entry["status"] = "FAILED"
+                    log_entry["message"] = message
+                    st.session_state.auto_email_log.append(log_entry)
+                    return False, message, log_entry
             else:
-                return False, "No urgent samples found, skipping auto email"
+                log_entry["status"] = "SKIPPED"
+                log_entry["message"] = "No urgent samples found"
+                st.session_state.auto_email_log.append(log_entry)
+                return False, "No urgent samples found, skipping auto email", log_entry
         else:
-            return False, "No data available"
+            log_entry["status"] = "ERROR"
+            log_entry["message"] = "No data available"
+            st.session_state.auto_email_log.append(log_entry)
+            return False, "No data available", log_entry
     
-    return False, "Not time yet"
+    # Reset sent flag at midnight if needed (handled by not_sent_today check above)
+    
+    return False, "Not time yet", log_entry
 
 def create_status_chart(df):
     """Create donut chart for status distribution"""
@@ -448,12 +422,7 @@ def create_status_chart(df):
         textposition='outside'
     )])
     
-    fig.update_layout(
-        title="Status Distribution",
-        height=400,
-        showlegend=True
-    )
-    
+    fig.update_layout(title="Status Distribution", height=400, showlegend=True)
     return fig
 
 def create_urgency_chart(df):
@@ -461,17 +430,14 @@ def create_urgency_chart(df):
     if df.empty:
         return go.Figure()
     
-    # Filter non-OK samples
     alert_df = df[df['Staus'].str.lower() != 'ok'].copy()
     
     if alert_df.empty:
-        # Create empty figure with message
         fig = go.Figure()
         fig.add_annotation(text="No pending samples", x=0.5, y=0.5, showarrow=False)
         fig.update_layout(title="Samples by Urgency Level", height=400)
         return fig
     
-    # Categorize urgency
     def categorize_urgency(days):
         if pd.isna(days):
             return 'Unknown'
@@ -487,7 +453,6 @@ def create_urgency_chart(df):
     alert_df['Urgency Category'] = alert_df['Days Left'].apply(categorize_urgency)
     urgency_counts = alert_df['Urgency Category'].value_counts()
     
-    # Define color order
     color_map = {
         'Overdue': '#dc3545',
         'Urgent (0-3 days)': '#ff6b6b',
@@ -524,10 +489,9 @@ def main():
     with st.sidebar:
         st.header("⚙️ Controls")
         
-        # Auto-refresh option
-        auto_refresh = st.checkbox("🔄 Auto-refresh data", value=True)  # Enable by default
+        auto_refresh = st.checkbox("🔄 Auto-refresh data", value=True)
         if auto_refresh:
-            refresh_rate = st.slider("Refresh rate (seconds)", 30, 300, 60)
+            refresh_rate = st.slider("Refresh rate (seconds)", 30, 300, 60, value=60)
             st.info(f"Data will refresh every {refresh_rate} seconds")
         
         st.markdown("---")
@@ -535,22 +499,19 @@ def main():
         # Email section
         st.header("📧 Email Notifications")
         
-        # Auto email status
         st.subheader("🤖 Auto Email Settings")
         st.info(f"📨 Auto emails scheduled daily at {AUTO_EMAIL_HOUR:02d}:{AUTO_EMAIL_MINUTE:02d}")
         
-        # Show current time
         current_time = datetime.now()
         st.caption(f"Current time: {current_time.strftime('%H:%M:%S')}")
         
         # Check and send auto email on each page load
-        auto_email_sent, auto_email_message = check_and_send_auto_email()
+        auto_email_sent, auto_email_message, auto_email_log = check_and_send_auto_email()
         
         # Show auto email status
         if st.session_state.last_auto_email_date:
             st.success(f"✅ Last auto email: {st.session_state.last_auto_email_date.strftime('%d-%m-%Y %H:%M:%S')}")
         
-        # Show today's status
         if st.session_state.auto_email_sent_today:
             st.success("✅ Auto email already sent today")
         else:
@@ -562,27 +523,34 @@ def main():
             minutes = (time_until.seconds % 3600) // 60
             st.info(f"⏰ Next auto email in: {hours}h {minutes}m")
         
-        # Show last check result if any
+        # Show auto email result
         if auto_email_sent:
             st.success(auto_email_message)
-        elif auto_email_message and auto_email_message != "Not time yet":
+        elif auto_email_message and auto_email_message not in ["Not time yet", "Auto email disabled"]:
             st.warning(auto_email_message)
+        
+        # Debug: Show auto email log
+        with st.expander("📋 Auto Email Log (Debug)"):
+            if st.session_state.auto_email_log:
+                for log in st.session_state.auto_email_log[-10:]:  # Show last 10 entries
+                    st.text(f"{log['timestamp']}: {log.get('status', 'Check')} - {log.get('message', '')}")
+                    if 'current_time' in log:
+                        st.text(f"  Time: {log['current_time']} vs {log['scheduled_time']}")
+            else:
+                st.text("No auto email attempts logged yet")
         
         st.markdown("---")
         
         # Recipient Management
         st.subheader("👥 Email Recipients")
         
-        # Primary recipient (TO field)
         st.markdown("**Primary Recipient (TO):**")
         new_primary = st.text_input("TO Email", value=st.session_state.primary_recipient)
         if new_primary != st.session_state.primary_recipient:
             st.session_state.primary_recipient = new_primary
         
-        # CC Recipients
         st.markdown("**CC Recipients:**")
         
-        # Display current CC recipients
         for i, email in enumerate(st.session_state.cc_recipients):
             col1, col2 = st.columns([4, 1])
             with col1:
@@ -592,7 +560,6 @@ def main():
                     st.session_state.cc_recipients.pop(i)
                     st.rerun()
         
-        # Add new CC recipient
         st.markdown("**Add CC Recipient:**")
         new_cc = st.text_input("CC Email", key="new_cc_recipient")
         col1, col2 = st.columns(2)
@@ -615,7 +582,6 @@ def main():
                 st.success("Reset to default recipients")
                 st.rerun()
         
-        # Show recipient summary
         st.markdown("---")
         st.markdown("**Recipient Summary:**")
         st.caption(f"📧 TO: {st.session_state.primary_recipient}")
@@ -651,13 +617,10 @@ def main():
                     st.error("No data available to send alerts")
         
         st.markdown("---")
-        
-        # Debug option
         debug_mode = st.checkbox("🔧 Show debug info", value=False)
     
     # Main content
     try:
-        # Fetch and process data
         with st.spinner("Loading data..."):
             df = fetch_data()
             df = process_data(df)
@@ -672,10 +635,8 @@ def main():
             """)
             return
         
-        # Store in session state
         st.session_state.df = df
         
-        # Debug info
         if debug_mode:
             with st.expander("Debug Information"):
                 st.write("DataFrame Info:")
@@ -690,6 +651,8 @@ def main():
                 st.write(f"CC Recipients: {st.session_state.cc_recipients}")
                 st.write(f"Auto email sent today: {st.session_state.auto_email_sent_today}")
                 st.write(f"Last auto email date: {st.session_state.last_auto_email_date}")
+                st.write(f"Auto email enabled: {AUTO_EMAIL_ENABLED}")
+                st.write(f"Scheduled time: {AUTO_EMAIL_HOUR:02d}:{AUTO_EMAIL_MINUTE:02d}")
         
         # Metrics Row
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -714,7 +677,6 @@ def main():
                      delta=f"{overdue_count} overdue" if overdue_count > 0 else None,
                      delta_color="inverse" if (urgent_count + overdue_count) > 0 else "normal")
         
-        # Alert banners for urgent items
         if overdue_count > 0:
             st.error(f"🔴 **CRITICAL ALERT:** {overdue_count} sample(s) are OVERDUE for revalidation! Immediate action required!")
         
@@ -735,7 +697,6 @@ def main():
         # Data Table with filters
         st.markdown("### 📋 Golden Sample Details")
         
-        # Filter options
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             status_filter = st.multiselect(
@@ -753,10 +714,8 @@ def main():
         with col4:
             sort_by = st.selectbox("Sort by", ['Days Left', 'Validation Date', 'Revalidation Due', 'Model'])
         
-        # Apply filters
         filtered_df = df[df['Staus'].isin(status_filter)]
         
-        # Apply urgency filter
         if urgency_filter != 'All':
             if urgency_filter == 'Overdue':
                 filtered_df = filtered_df[filtered_df['Days Left'] < 0]
@@ -770,29 +729,20 @@ def main():
         if search_model:
             filtered_df = filtered_df[filtered_df['Model'].str.contains(search_model, case=False, na=False)]
         
-        # Sort
         if sort_by in filtered_df.columns:
-            if sort_by == 'Days Left':
-                filtered_df = filtered_df.sort_values(sort_by, ascending=True)
-            else:
-                filtered_df = filtered_df.sort_values(sort_by, ascending=True)
+            filtered_df = filtered_df.sort_values(sort_by, ascending=True)
         
-        # Display dataframe with styling
         display_columns = ['Model', 'Validation Date Display', 'Revalidation Due Display', 
                           'Days Left', 'Staus', 'Incharge', 'Alert Status']
         
         available_columns = [col for col in display_columns if col in filtered_df.columns]
         display_df = filtered_df[available_columns].copy()
-        
-        # Replace NaN values
         display_df = display_df.fillna('-')
         
-        # Format Days Left for better display
         display_df['Days Left'] = display_df['Days Left'].apply(
             lambda x: f"{int(x)} days" if x != '-' and pd.notna(x) and x != '-' else '-'
         )
         
-        # Color code the entire row based on urgency
         def highlight_row(row):
             if 'Days Left' in row and row['Days Left'] != '-':
                 try:
@@ -806,10 +756,8 @@ def main():
             return [''] * len(row)
         
         styled_df = display_df.style.apply(highlight_row, axis=1)
-        
         st.dataframe(styled_df, use_container_width=True, height=500)
         
-        # Export button
         if st.button("📥 Export to CSV", use_container_width=True):
             csv = display_df.to_csv(index=False)
             st.download_button(
@@ -820,7 +768,6 @@ def main():
                 key="download_csv"
             )
         
-        # Auto-refresh logic - this ensures the page reloads and checks for auto email
         if auto_refresh:
             time.sleep(refresh_rate)
             st.rerun()
