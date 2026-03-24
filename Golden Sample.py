@@ -10,6 +10,7 @@ import time
 import threading
 import os
 import json
+import hashlib
 
 warnings.filterwarnings('ignore')
 
@@ -28,14 +29,15 @@ CC_RECIPIENTS = [
 ]
 
 # Auto email settings
-AUTO_EMAIL_HOUR = 15
-AUTO_EMAIL_MINUTE = 55
+AUTO_EMAIL_HOUR = 09
+AUTO_EMAIL_MINUTE = 00
 # Fires if current time is within +/- this many minutes of target (handles restarts)
 AUTO_EMAIL_WINDOW_MINUTES = 10
 AUTO_EMAIL_ENABLED = True
 
 # Persistent state file — survives thread/process restarts on Streamlit Cloud
 STATE_FILE = "/tmp/golden_sample_email_state.json"
+SENT_FLAG_FILE = "/tmp/golden_sample_sent_flag.json"
 # ===================================
 
 st.set_page_config(
@@ -55,25 +57,112 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────
-#  PERSISTENT STATE  (file-based — survives thread restarts)
+#  PERSISTENT STATE WITH DEDUPLICATION
 # ─────────────────────────────────────────────────────────────
 
 def _load_state() -> dict:
+    """Load persistent state with deduplication tracking"""
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r") as f:
                 return json.load(f)
     except Exception:
         pass
-    return {"last_sent_date": None, "last_sent_time": None, "last_result": ""}
+    return {
+        "last_sent_date": None, 
+        "last_sent_time": None, 
+        "last_result": "",
+        "sent_emails": []  # Track sent emails with timestamps
+    }
 
 
 def _save_state(state: dict):
+    """Save persistent state"""
     try:
+        # Keep only last 10 sent emails for tracking
+        if "sent_emails" in state and len(state["sent_emails"]) > 10:
+            state["sent_emails"] = state["sent_emails"][-10:]
         with open(STATE_FILE, "w") as f:
             json.dump(state, f)
     except Exception:
         pass
+
+
+def _get_email_hash(df) -> str:
+    """Create a unique hash for the current data to prevent duplicate sends"""
+    due_records = get_due_records(df)
+    overdue_records = get_overdue_records(df)
+    
+    # Create a hash based on the records that need attention
+    if due_records.empty and overdue_records.empty:
+        return None
+    
+    # Combine the data into a string for hashing
+    data_string = ""
+    for _, row in due_records.iterrows():
+        data_string += f"{row.get('Model', '')}_{row.get('Days Left', 0)}_{row.get('Staus', '')}"
+    for _, row in overdue_records.iterrows():
+        data_string += f"{row.get('Model', '')}_{row.get('Days Left', 0)}_{row.get('Staus', '')}"
+    
+    return hashlib.md5(data_string.encode()).hexdigest()
+
+
+def _already_sent_for_data(df) -> bool:
+    """Check if email with same data has already been sent today"""
+    state = _load_state()
+    current_hash = _get_email_hash(df)
+    
+    if not current_hash:
+        return False
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Check if this hash was sent today
+    for sent in state.get("sent_emails", []):
+        if (sent.get("hash") == current_hash and 
+            sent.get("date") == today):
+            return True
+    
+    return False
+
+
+def _mark_email_sent(df, success: bool, message: str):
+    """Mark that an email has been sent for the current data"""
+    state = _load_state()
+    current_hash = _get_email_hash(df)
+    
+    if not current_hash:
+        return
+    
+    today = datetime.now().strftime("%Y-%m-%d")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Add to sent emails list
+    if "sent_emails" not in state:
+        state["sent_emails"] = []
+    
+    # Check if already exists (prevent duplicates)
+    existing = False
+    for sent in state["sent_emails"]:
+        if sent.get("hash") == current_hash and sent.get("date") == today:
+            existing = True
+            break
+    
+    if not existing:
+        state["sent_emails"].append({
+            "hash": current_hash,
+            "date": today,
+            "time": now_str,
+            "success": success,
+            "message": message
+        })
+    
+    # Update last sent info
+    state["last_sent_date"] = today
+    state["last_sent_time"] = now_str
+    state["last_result"] = f"{'✅' if success else '❌'} Auto email sent at {now_str}" if success else f"❌ Failed: {message}"
+    
+    _save_state(state)
 
 
 def _is_in_send_window() -> bool:
@@ -88,6 +177,7 @@ def _is_in_send_window() -> bool:
 
 
 def _already_sent_today() -> bool:
+    """Check if any email was sent today (regardless of data)"""
     state = _load_state()
     last_sent_date = state.get("last_sent_date")
     if not last_sent_date:
@@ -101,69 +191,78 @@ def _already_sent_today() -> bool:
 def check_and_trigger_auto_email(df):
     """
     Called on EVERY page load/rerun.
-    Sends auto email if: enabled + in time window + not sent today.
+    Sends auto email if: enabled + in time window + not sent for current data.
     Returns (sent: bool, message: str)
     """
     if not AUTO_EMAIL_ENABLED:
         return False, ""
     if not _is_in_send_window():
         return False, ""
-    if _already_sent_today():
-        return False, ""
-
+    
+    # Check if already sent for this data
+    if _already_sent_for_data(df):
+        return False, "Already sent for current data"
+    
     due = get_due_records(df)
     over = get_overdue_records(df)
 
-    state = _load_state()
-    now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-
     if due.empty and over.empty:
-        state["last_sent_date"] = datetime.now().strftime("%Y-%m-%d")
-        state["last_result"] = "ℹ️ No urgent samples – auto email skipped today"
-        _save_state(state)
-        return False, state["last_result"]
+        # No urgent samples, mark as sent to avoid repeated checks
+        _mark_email_sent(df, False, "No urgent samples")
+        return False, "No urgent samples"
 
+    # Send email
     success, msg = _send_email(df, PRIMARY_RECIPIENT, CC_RECIPIENTS, "auto")
-    state["last_sent_date"] = datetime.now().strftime("%Y-%m-%d")
-    state["last_sent_time"] = now_str
-    state["last_result"] = f"✅ Auto email sent at {now_str}" if success else f"❌ Auto send failed: {msg}"
-    _save_state(state)
-    return success, state["last_result"]
+    
+    # Mark as sent
+    _mark_email_sent(df, success, msg)
+    
+    return success, msg
 
 
 # ─────────────────────────────────────────────────────────────
-#  BACKGROUND THREAD  (secondary safety net)
+#  BACKGROUND THREAD (with deduplication)
 # ─────────────────────────────────────────────────────────────
 
 _thread_started = {"value": False}
+_last_thread_check = {"timestamp": None}
 
 
 def _background_scheduler():
+    """Background thread with deduplication to prevent multiple sends"""
     while True:
         try:
-            if AUTO_EMAIL_ENABLED and _is_in_send_window() and not _already_sent_today():
+            if AUTO_EMAIL_ENABLED and _is_in_send_window():
+                # Check if we already processed recently (within last 2 minutes)
+                current_time = time.time()
+                if _last_thread_check["timestamp"] and (current_time - _last_thread_check["timestamp"]) < 120:
+                    time.sleep(60)
+                    continue
+                
+                _last_thread_check["timestamp"] = current_time
+                
+                # Fetch fresh data
                 df_raw = pd.read_csv(CSV_URL)
                 df_proc = process_data(df_raw)
+                
                 if df_proc is not None:
-                    state = _load_state()
-                    now_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-                    due = get_due_records(df_proc)
-                    over = get_overdue_records(df_proc)
-                    if not due.empty or not over.empty:
-                        success, msg = _send_email(df_proc, PRIMARY_RECIPIENT, CC_RECIPIENTS, "auto")
-                        state["last_sent_date"] = datetime.now().strftime("%Y-%m-%d")
-                        state["last_sent_time"] = now_str
-                        state["last_result"] = f"✅ Auto email sent at {now_str}" if success else f"❌ Failed: {msg}"
-                    else:
-                        state["last_sent_date"] = datetime.now().strftime("%Y-%m-%d")
-                        state["last_result"] = "ℹ️ No urgent samples – auto email skipped"
-                    _save_state(state)
+                    # Check if already sent for this data
+                    if not _already_sent_for_data(df_proc):
+                        due = get_due_records(df_proc)
+                        over = get_overdue_records(df_proc)
+                        
+                        if not due.empty or not over.empty:
+                            success, msg = _send_email(df_proc, PRIMARY_RECIPIENT, CC_RECIPIENTS, "auto")
+                            _mark_email_sent(df_proc, success, msg)
+                        else:
+                            # No urgent samples, mark as sent to avoid repeated checks
+                            _mark_email_sent(df_proc, False, "No urgent samples")
         except Exception as e:
-            state = _load_state()
-            state["last_result"] = f"❌ Thread error: {e}"
-            _save_state(state)
-        time.sleep(60)
-
+            # Log error but don't crash
+            print(f"Thread error: {e}")
+        
+        # Wait longer to reduce frequency (5 minutes instead of 1)
+        time.sleep(300)  # Check every 5 minutes during window
 
 def _ensure_scheduler_running():
     if not _thread_started["value"]:
@@ -183,6 +282,8 @@ def _init_session_state():
         st.session_state.cc_recipients = CC_RECIPIENTS.copy()
     if "df" not in st.session_state:
         st.session_state.df = None
+    if "last_email_sent" not in st.session_state:
+        st.session_state.last_email_sent = None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -316,7 +417,7 @@ def send_single_email_alert(df, primary_recipient, cc_recipients, alert_type="ma
 
 
 def _generate_email_html(due_records, overdue_records):
-    headers = "<tr>" + "".join(
+    headers = "<table" + "".join(
         f"<th>{h}</th>" for h in
         ["Model", "Validation Date", "Revalidation Due", "Days Left", "Current Status", "Incharge", "Alert"]
     ) + "</tr>"
@@ -435,7 +536,7 @@ def main():
     auto_sent, auto_msg = False, ""
     if df is not None:
         st.session_state.df = df
-        # ✅ KEY: Runs on every rerun — fires email if inside time window
+        # Runs on every rerun — fires email if inside time window and not sent for current data
         auto_sent, auto_msg = check_and_trigger_auto_email(df)
 
     # ── Sidebar ──────────────────────────────────────────────
@@ -472,7 +573,7 @@ def main():
             st.success("✅ Auto email already sent today")
         else:
             if _is_in_send_window():
-                st.warning("🟡 INSIDE send window — will fire on next refresh if not sent")
+                st.warning("🟡 INSIDE send window — will fire once on next refresh if data has changed")
             else:
                 target = now.replace(
                     hour=AUTO_EMAIL_HOUR, minute=AUTO_EMAIL_MINUTE,
@@ -576,10 +677,13 @@ def main():
                 st.write("**Persistent state:**", _load_state())
                 st.write("**In send window:**", _is_in_send_window())
                 st.write("**Sent today:**", _already_sent_today())
+                st.write("**Sent for current data:**", _already_sent_for_data(df) if df is not None else False)
                 st.write("**Thread running:**", _thread_started["value"])
                 st.write(f"**Window:** {w_start} – {w_end}")
                 if df is not None:
                     st.write(f"**Rows:** {len(df)}")
+                    st.write(f"**Urgent samples:** {len(get_due_records(df))}")
+                    st.write(f"**Overdue samples:** {len(get_overdue_records(df))}")
                     st.dataframe(df.head(3))
 
     # ── Main content ─────────────────────────────────────────
