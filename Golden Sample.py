@@ -22,13 +22,12 @@ SENDER_PASSWORD = "gzxzuolbmqkdhcst"  # App Password
 PRIMARY_RECIPIENT = "emurugesan.padget@dixoninfo.com"  # Main recipient (To field)
 CC_RECIPIENTS = [
     "chauhandeesingh@gmail.com",
-    "rajgopal.padget@dixoninfo.com",
     # Add more CC recipients here
 ]
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 12  # Set to 12 PM
-AUTO_EMAIL_MINUTE = 26  # Set to 26 minutes
+AUTO_EMAIL_MINUTE = 36  # Set to 26 minutes
 AUTO_EMAIL_ENABLED = True
 
 # ===================================
