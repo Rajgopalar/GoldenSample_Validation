@@ -214,7 +214,6 @@ def parse_date_safe(date_str):
 def fetch_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Clean column names
         df.columns = df.columns.str.strip()
         return df
     except Exception as e:
@@ -228,7 +227,6 @@ def process_data(df):
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    # Check required columns
     required_cols = ['Validation Date', 'Staus', 'Model']
     for col in required_cols:
         if col not in df.columns:
@@ -271,12 +269,12 @@ def process_data(df):
 
     df['Alert Status'] = df.apply(get_alert_status, axis=1)
     
-    # Clean data - keep ALL rows with valid Model and Status
-    df = df.dropna(subset=['Model', 'Staus'])
+    # Clean data - remove any rows with missing critical data
+    df = df.dropna(subset=['Model', 'Staus', 'Validation Date Display'])
     df = df[df['Model'].astype(str).str.strip() != '']
     df = df[df['Staus'].astype(str).str.strip() != '']
     
-    # Standardize status values for consistency
+    # Standardize status values
     df['Staus'] = df['Staus'].astype(str).str.strip().str.capitalize()
     
     return df
@@ -426,12 +424,11 @@ def check_and_send_auto_email(df):
 def create_status_chart(df):
     counts = df['Staus'].value_counts()
     
-    # Colors: Green for OK, Orange for Pending, Dark Red for NG
+    # Colors for chart - bright and clear
     color_map = {
         'Ok': '#28a745',      # Green
-        'Ok': '#28a745',
         'Pending': '#fd7e14', # Orange
-        'NG': '#8B0000'       # Dark Red
+        'Ng': '#dc3545'       # Red
     }
     
     colors = []
@@ -441,7 +438,7 @@ def create_status_chart(df):
         elif status.lower() == 'pending':
             colors.append('#fd7e14')
         elif status.lower() == 'ng':
-            colors.append('#8B0000')
+            colors.append('#dc3545')
         else:
             colors.append('#6c757d')
     
@@ -454,7 +451,8 @@ def create_status_chart(df):
         textposition='outside',
         textfont=dict(family='Arial Narrow', size=12, weight='bold'),
         insidetextfont=dict(size=12, weight='bold'),
-        showlegend=False
+        showlegend=True,
+        legend=dict(font=dict(family='Arial Narrow', size=10))
     )])
     
     fig.update_layout(
@@ -466,7 +464,7 @@ def create_status_chart(df):
 
 
 def create_urgency_chart(df):
-    # Filter non-OK samples
+    # Filter non-OK samples for urgency chart
     alert_df = df[df['Staus'].str.lower() != 'ok'].copy()
     
     if alert_df.empty:
@@ -494,9 +492,9 @@ def create_urgency_chart(df):
     alert_df['Category'] = alert_df['Days Left'].apply(cat)
     counts = alert_df['Category'].value_counts()
     
-    # Colors for urgency
+    # Colors for urgency chart
     color_map = {
-        'Overdue': '#8B0000',      # Dark Red
+        'Overdue': '#dc3545',      # Red
         'Urgent (0-3)': '#fd7e14', # Orange
         'Due Soon (4-7)': '#17a2b8', # Blue
         'On Track': '#28a745',     # Green
@@ -591,8 +589,8 @@ def main():
         with col_f1:
             status_filter = st.multiselect(
                 "Status", 
-                options=['Ok', 'Pending', 'NG'], 
-                default=['Ok', 'Pending', 'NG'],
+                options=['Ok', 'Pending', 'Ng'], 
+                default=['Ok', 'Pending', 'Ng'],
                 key="status_filter"
             )
         with col_f2:
@@ -604,7 +602,7 @@ def main():
         with col_f3:
             search_model = st.text_input("🔍 Search Model", placeholder="Enter model name...", key="search_model")
         
-        # Apply filters - ensure OK data is included
+        # Apply filters
         filtered_df = df[df['Staus'].isin(status_filter)]
         
         # Apply urgency filter
@@ -620,10 +618,11 @@ def main():
         if search_model:
             filtered_df = filtered_df[filtered_df['Model'].str.contains(search_model, case=False, na=False)]
         
-        # Remove any blank rows - ensure all rows have data
-        filtered_df = filtered_df.dropna(subset=['Model', 'Staus'])
+        # Remove any blank rows - aggressive cleaning
+        filtered_df = filtered_df.dropna(subset=['Model', 'Staus', 'Validation Date Display'])
         filtered_df = filtered_df[filtered_df['Model'].astype(str).str.strip() != '']
         filtered_df = filtered_df[filtered_df['Staus'].astype(str).str.strip() != '']
+        filtered_df = filtered_df[filtered_df['Validation Date Display'].astype(str).str.strip() != '']
         
         # Display table
         display_cols = ['Model', 'Validation Date Display', 'Revalidation Due Display', 
@@ -638,33 +637,33 @@ def main():
             lambda x: f"{int(x)}d" if x != '-' and pd.notna(x) and x != '-' else '-'
         )
         
-        # Color function for status - Green for OK, Orange for Pending, Dark Red for NG
-        def color_status(val):
+        # Light color function for status - light backgrounds only
+        def color_status_light(val):
             if val.lower() == 'ok':
-                return 'background-color: #28a745; color: white; font-weight: bold; text-align: center'
+                return 'background-color: #d4edda; color: #155724; font-weight: bold;'
             elif val.lower() == 'pending':
-                return 'background-color: #fd7e14; color: white; font-weight: bold; text-align: center'
+                return 'background-color: #fff3cd; color: #856404; font-weight: bold;'
             elif val.lower() == 'ng':
-                return 'background-color: #8B0000; color: white; font-weight: bold; text-align: center'
+                return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
             return ''
         
-        # Apply styling
-        styled_df = display_df.style.applymap(color_status, subset=['Staus'])
+        # Apply light background styling
+        styled_df = display_df.style.applymap(color_status_light, subset=['Staus'])
         
-        # Highlight days left
-        def highlight_days(val):
+        # Light highlight for days left
+        def highlight_days_light(val):
             if val != '-' and 'd' in str(val):
                 try:
                     days = int(str(val).replace('d', ''))
                     if days < 0:
-                        return 'background-color: #8B0000; color: white; font-weight: bold; text-align: center'
+                        return 'background-color: #f8d7da; color: #721c24; font-weight: bold;'
                     elif days <= 3:
-                        return 'background-color: #fd7e14; color: white; font-weight: bold; text-align: center'
+                        return 'background-color: #fff3cd; color: #856404; font-weight: bold;'
                 except:
                     pass
             return ''
         
-        styled_df = styled_df.applymap(highlight_days, subset=['Days Left'])
+        styled_df = styled_df.applymap(highlight_days_light, subset=['Days Left'])
         
         st.dataframe(styled_df, use_container_width=True, height=450)
         
