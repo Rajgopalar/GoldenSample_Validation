@@ -8,23 +8,6 @@
 
 > A professional dashboard for tracking golden sample revalidations with automated email alerts and real-time monitoring.
 
-## 📌 Table of Contents
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Live Demo](#-live-demo)
-- [Screenshots](#-screenshots)
-- [Technology Stack](#-technology-stack)
-- [Quick Start](#-quick-start)
-- [Configuration](#-configuration)
-- [Data Source](#-data-source)
-- [Project Structure](#-project-structure)
-- [Deployment](#-deployment)
-- [Customization](#-customization)
-- [Troubleshooting](#-troubleshooting)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
-
 ## 📊 Overview
 
 The **Golden Sample Revalidation Tracker** is a comprehensive monitoring solution designed for manufacturing and quality control environments. It helps track sample validation dates, sends automated reminders for revalidations, and provides real-time insights into sample status across your organization.
@@ -87,7 +70,7 @@ Experience the application live: [Golden Sample Tracker](https://your-app-url.st
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.13
 - Gmail account with App Password enabled
 - Git (for cloning)
 
