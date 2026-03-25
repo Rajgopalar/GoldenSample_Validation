@@ -53,125 +53,115 @@ st.markdown("""
     
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem 2rem;
+        padding: 0.8rem 2rem;
         border-radius: 12px;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     
     .main-header h1 {
-        font-size: 1.8rem !important;
+        font-size: 1.5rem !important;
         margin: 0 !important;
         padding: 0 !important;
         font-weight: 600 !important;
-        letter-spacing: -0.5px;
     }
     
-    /* Metric Cards */
+    /* Metric Cards - Compact */
     .metric-card {
         background: white;
-        padding: 1rem;
-        border-radius: 12px;
+        padding: 0.6rem;
+        border-radius: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         border: 1px solid #e9ecef;
+        text-align: center;
         transition: all 0.2s;
     }
     
-    .metric-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        transform: translateY(-2px);
-    }
-    
     .metric-value {
-        font-size: 2rem;
+        font-size: 1.5rem;
         font-weight: 700;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.1rem;
     }
     
     .metric-label {
-        font-size: 0.85rem;
+        font-size: 0.7rem;
         color: #6c757d;
         font-weight: 500;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
     }
     
-    /* Filter Section */
-    .filter-section {
-        background: #f8f9fa;
-        padding: 0.75rem 1rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-        border: 1px solid #e9ecef;
-    }
-    
-    /* Alert Banners */
+    /* Alert Banners - Compact */
     .alert-critical {
         background: linear-gradient(135deg, #fef3f2 0%, #fff5f5 100%);
-        border-left: 4px solid #dc2626;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
+        border-left: 3px solid #dc2626;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        margin: 0;
+        font-size: 0.8rem;
     }
     
     .alert-urgent {
         background: linear-gradient(135deg, #fffbeb 0%, #fff9e6 100%);
-        border-left: 4px solid #f59e0b;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
+        border-left: 3px solid #f59e0b;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        margin: 0;
+        font-size: 0.8rem;
     }
     
     .alert-success {
         background: linear-gradient(135deg, #f0fdf4 0%, #f3fef7 100%);
-        border-left: 4px solid #10b981;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
+        border-left: 3px solid #10b981;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        margin: 0;
+        font-size: 0.8rem;
     }
     
-    /* Buttons */
+    /* Control Bar */
+    .control-bar {
+        background: #f8f9fa;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+        border: 1px solid #e9ecef;
+    }
+    
     .stButton button {
         border-radius: 8px !important;
         font-weight: 500 !important;
-        padding: 0.4rem 1rem !important;
+        padding: 0.3rem 0.8rem !important;
+        font-size: 0.8rem !important;
         transition: all 0.2s !important;
     }
     
-    .stButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    .stSelectbox label, .stMultiselect label, .stTextInput label {
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+        margin-bottom: 0.2rem !important;
     }
     
-    /* Table Styling */
+    .stSelectbox, .stMultiselect, .stTextInput {
+        font-size: 0.8rem !important;
+    }
+    
     .stDataFrame {
-        border-radius: 12px;
+        border-radius: 10px;
         overflow: hidden;
         border: 1px solid #e9ecef;
     }
     
-    /* Status Badges */
-    .status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-align: center;
-    }
-    
-    /* Chart Containers */
     .chart-container {
         background: white;
-        padding: 0.75rem;
-        border-radius: 12px;
+        padding: 0.5rem;
+        border-radius: 10px;
         border: 1px solid #e9ecef;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
     }
     
-    /* Divider */
     hr {
-        margin: 1rem 0;
+        margin: 0.5rem 0;
         border-color: #e9ecef;
     }
 </style>
@@ -367,18 +357,18 @@ def send_email_alert(df, primary_recipient, cc_recipients):
 
 
 def generate_email_html(due_records, overdue_records):
-    headers = "<tr>" + "".join(f"<th style='padding:10px;background:#667eea;color:white;'>{h}</th>" for h in
-        ["Model", "Validation Date", "Revalidation Due", "Days Left", "Status", "Incharge", "Alert"]) + "</tr>"
+    headers = "\\n<table>\\n<thead>\\n<tr>" + "".join(f"<th style='padding:8px;background:#667eea;color:white;'>{h}</th>" for h in
+        ["Model", "Validation Date", "Revalidation Due", "Days Left", "Status", "Incharge", "Alert"]) + "</tr>\\n</thead>\\n<tbody>"
 
     def make_row(row, bg, days_text, badge):
         return f'<tr style="background-color:{bg};">' + ''.join([
-            f'<td style="padding:8px;"><b>{row.get("Model","")}</b></td>',
-            f'<td style="padding:8px;">{row.get("Validation Date Display","")}</td>',
-            f'<td style="padding:8px;">{row.get("Revalidation Due Display","")}</td>',
-            f'<td style="padding:8px;color:#dc3545;">{days_text}</td>',
-            f'<td style="padding:8px;"><b>{row.get("Staus","")}</b></td>',
-            f'<td style="padding:8px;">{row.get("Incharge","")}</td>',
-            f'<td style="padding:8px;color:#dc3545;">{badge}</td>',
+            f'<td style="padding:6px;"><b>{row.get("Model","")}</b></td>',
+            f'<td style="padding:6px;">{row.get("Validation Date Display","")}</td>',
+            f'<td style="padding:6px;">{row.get("Revalidation Due Display","")}</td>',
+            f'<td style="padding:6px;color:#dc3545;">{days_text}</td>',
+            f'<td style="padding:6px;"><b>{row.get("Staus","")}</b></td>',
+            f'<td style="padding:6px;">{row.get("Incharge","")}</td>',
+            f'<td style="padding:6px;color:#dc3545;">{badge}</td>',
         ]) + '</tr>'
 
     over_rows = "".join(make_row(r, "#fef3f2", f"{abs(int(r['Days Left']))}d overdue", "🔴 OVERDUE") 
@@ -390,19 +380,19 @@ def generate_email_html(due_records, overdue_records):
 
     return f"""<html>
 <head><style>
-    body{{font-family:'Inter',sans-serif;margin:0;padding:20px;background:#f8fafc;}}
-    .header{{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:20px;text-align:center;border-radius:12px;}}
-    .alert{{background:#fef3f2;border-left:4px solid #dc2626;padding:12px;margin:15px 0;border-radius:8px;}}
-    table{{border-collapse:collapse;width:100%;margin:15px 0;border-radius:8px;overflow:hidden;}}
-    th{{background:#667eea;color:white;padding:10px;}}
-    td{{padding:8px;border-bottom:1px solid #e2e8f0;}}
-    .footer{{margin-top:20px;padding:12px;background:#f1f5f9;text-align:center;border-radius:8px;}}
+    body{{font-family:'Inter',sans-serif;margin:0;padding:15px;background:#f8fafc;}}
+    .header{{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:12px;text-align:center;border-radius:10px;}}
+    .alert{{background:#fef3f2;border-left:3px solid #dc2626;padding:8px;margin:10px 0;border-radius:6px;font-size:12px;}}
+    table{{border-collapse:collapse;width:100%;margin:10px 0;border-radius:8px;overflow:hidden;}}
+    th{{background:#667eea;color:white;padding:8px;}}
+    td{{padding:6px;border-bottom:1px solid #e2e8f0;font-size:12px;}}
+    .footer{{margin-top:12px;padding:8px;background:#f1f5f9;text-align:center;border-radius:6px;font-size:10px;}}
 </style></head>
 <body>
-    <div class="header"><h2>Golden Sample Tracker</h2><p>🚨 Urgent Action Required</p></div>
+    <div class="header"><h3>Golden Sample Tracker</h3><p>🚨 Urgent Action Required</p></div>
     <div class="alert"><strong>⚠️ Alert:</strong> {total} sample(s) need attention!<br>• {len(overdue_records)} Overdue • {len(due_records)} Due within 3 days</div>
-    <h3>🔴 Overdue Samples</h3><table><thead>{headers}</thead><tbody>{over_rows}</tbody></table>
-    <h3>⚠️ Samples Due Within 3 Days</h3><table><thead>{headers}</thead><tbody>{due_rows}</tbody></table>
+    <h3>🔴 Overdue Samples</h3>{headers}{over_rows}</tbody></table>
+    <h3>⚠️ Samples Due Within 3 Days</h3>{headers}{due_rows}</tbody></table>
     <div class="footer"><p>Generated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}</p></div>
 </body></html>"""
 
@@ -439,7 +429,7 @@ def check_and_send_auto_email(df):
 def create_status_chart(df):
     if df.empty:
         fig = go.Figure()
-        fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10))
+        fig.update_layout(height=240, margin=dict(l=10, r=10, t=30, b=10))
         return fig
     
     counts = df['Staus'].value_counts()
@@ -462,15 +452,15 @@ def create_status_chart(df):
         marker_colors=colors,
         textinfo='label+percent',
         textposition='outside',
-        textfont=dict(family='Inter', size=11),
+        textfont=dict(family='Inter', size=10),
         hoverinfo='label+value'
     )])
     
     fig.update_layout(
-        title=dict(text="Status Distribution", font=dict(family='Inter', size=14, weight='bold')),
-        height=280,
+        title=dict(text="Status Distribution", font=dict(family='Inter', size=12, weight='bold')),
+        height=240,
         showlegend=False,
-        margin=dict(l=10, r=10, t=40, b=10),
+        margin=dict(l=10, r=10, t=30, b=10),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
@@ -483,8 +473,8 @@ def create_urgency_chart(df):
     if alert_df.empty:
         fig = go.Figure()
         fig.add_annotation(text="No pending samples", x=0.5, y=0.5, showarrow=False,
-                          font=dict(family='Inter', size=12))
-        fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10))
+                          font=dict(family='Inter', size=10))
+        fig.update_layout(height=240, margin=dict(l=10, r=10, t=30, b=10))
         return fig
 
     def cat(d):
@@ -506,16 +496,16 @@ def create_urgency_chart(df):
         marker_color=[colors.get(cat, '#6b7280') for cat in counts.index],
         text=counts.values.tolist(),
         textposition='auto',
-        textfont=dict(family='Inter', size=11)
+        textfont=dict(family='Inter', size=10)
     )])
     
     fig.update_layout(
-        title=dict(text="Samples by Urgency", font=dict(family='Inter', size=14, weight='bold')),
-        xaxis=dict(title="", tickfont=dict(family='Inter', size=10)),
-        yaxis=dict(title="Count", title_font=dict(family='Inter', size=11), tickfont=dict(family='Inter', size=10)),
-        height=280,
+        title=dict(text="Samples by Urgency", font=dict(family='Inter', size=12, weight='bold')),
+        xaxis=dict(title="", tickfont=dict(family='Inter', size=9)),
+        yaxis=dict(title="Count", title_font=dict(family='Inter', size=10), tickfont=dict(family='Inter', size=9)),
+        height=240,
         showlegend=False,
-        margin=dict(l=20, r=20, t=40, b=30),
+        margin=dict(l=20, r=20, t=30, b=20),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
@@ -547,7 +537,7 @@ def main():
     if auto_sent:
         st.toast(auto_msg, icon="✅")
     
-    # Metrics Row
+    # Compact Metrics Row
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     
     total = len(df)
@@ -558,7 +548,7 @@ def main():
     overdue_count = len(get_overdue_records(df))
     
     with col1:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-label">Total Samples</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-label">Total</div></div>', unsafe_allow_html=True)
     with col2:
         st.markdown(f'<div class="metric-card"><div class="metric-value" style="color:#10b981;">{ok_count}</div><div class="metric-label">✅ OK</div></div>', unsafe_allow_html=True)
     with col3:
@@ -570,28 +560,26 @@ def main():
     with col6:
         st.markdown(f'<div class="metric-card"><div class="metric-value" style="color:#dc2626;">{overdue_count}</div><div class="metric-label">⚠️ Overdue</div></div>', unsafe_allow_html=True)
     
-    # Alerts
+    # Charts Row (Compact)
+    col_chart1, col_chart2 = st.columns(2)
+    with col_chart1:
+        st.plotly_chart(create_status_chart(df), use_container_width=True, config={'displayModeBar': False})
+    with col_chart2:
+        st.plotly_chart(create_urgency_chart(df), use_container_width=True, config={'displayModeBar': False})
+    
+    # Alerts above table (compact)
     if overdue_count > 0:
         st.markdown(f'<div class="alert-critical">🔴 <strong>Critical Alert:</strong> {overdue_count} sample(s) are OVERDUE for revalidation!</div>', unsafe_allow_html=True)
     if urgent_count > 0:
         st.markdown(f'<div class="alert-urgent">⚠️ <strong>Urgent Alert:</strong> {urgent_count} sample(s) require revalidation within 3 days!</div>', unsafe_allow_html=True)
     
-    # Charts Row
-    col_chart1, col_chart2 = st.columns(2)
-    with col_chart1:
-        with st.container():
-            st.plotly_chart(create_status_chart(df), use_container_width=True, config={'displayModeBar': False})
-    with col_chart2:
-        with st.container():
-            st.plotly_chart(create_urgency_chart(df), use_container_width=True, config={'displayModeBar': False})
-    
-    # Table Section with Minimized Filters
+    # Control Bar - Filters, Search, Export on Top
     st.markdown("### 📋 Sample Details")
     
-    # Compact Filter Bar - Minimized Status Filter
-    filter_cols = st.columns([2, 2, 2, 1, 1, 1])
+    # Compact Control Row
+    control_cols = st.columns([1.5, 1.5, 2, 1, 1, 1])
     
-    with filter_cols[0]:
+    with control_cols[0]:
         status_filter = st.multiselect(
             "Status",
             options=['Ok', 'Pending', 'Ng'],
@@ -599,29 +587,32 @@ def main():
             key="status_filter"
         )
     
-    with filter_cols[1]:
+    with control_cols[1]:
         urgency_filter = st.selectbox(
             "Urgency",
             options=['All', 'Overdue', 'Urgent', 'Due Soon', 'On Track'],
             key="urgency_filter"
         )
     
-    with filter_cols[2]:
-        search_model = st.text_input("🔍 Search", placeholder="Model...", key="search_model")
+    with control_cols[2]:
+        search_model = st.text_input("🔍 Search Model", placeholder="Enter model name...", key="search_model")
     
-    with filter_cols[3]:
-        if st.button("📥 Export", use_container_width=True):
+    with control_cols[3]:
+        if st.button("📥 Export CSV", use_container_width=True, key="export_btn"):
             csv = df.to_csv(index=False)
-            st.download_button("Download", csv, f"report_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", key="dl")
+            st.download_button("Download", csv, f"report_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv", key="download_btn")
     
-    with filter_cols[4]:
-        if st.button("📧 Alert", use_container_width=True):
+    with control_cols[4]:
+        if st.button("📧 Send Alert", use_container_width=True, key="alert_btn"):
             with st.spinner("Sending..."):
                 success, msg = send_email_alert(df, st.session_state.primary_recipient, st.session_state.cc_recipients)
-                st.success(msg) if success else st.error(msg)
+                if success:
+                    st.success(msg)
+                else:
+                    st.error(msg)
     
-    with filter_cols[5]:
-        if st.button("🔄 Refresh", use_container_width=True):
+    with control_cols[5]:
+        if st.button("🔄 Refresh", use_container_width=True, key="refresh_btn"):
             st.cache_data.clear()
             st.rerun()
     
@@ -644,19 +635,28 @@ def main():
     filtered_df = filtered_df.dropna(subset=['Model', 'Staus'])
     filtered_df = filtered_df[filtered_df['Model'].astype(str).str.strip() != '']
     
-    # Display table
+    # Display table with NG showing blank for Days Left
     display_df = filtered_df[['Model', 'Validation Date Display', 'Revalidation Due Display', 'Days Left', 'Staus', 'Incharge', 'Alert Status']].copy()
     display_df = display_df.fillna('-')
-    display_df['Days Left'] = display_df['Days Left'].apply(lambda x: f"{int(x)}d" if x != '-' and pd.notna(x) else '-')
+    
+    # For NG status, set Days Left to blank
+    def format_days_left(row):
+        if row['Staus'].lower() == 'ng':
+            return '-'
+        elif row['Days Left'] != '-' and pd.notna(row['Days Left']):
+            return f"{int(row['Days Left'])}d"
+        return '-'
+    
+    display_df['Days Left'] = display_df.apply(format_days_left, axis=1)
     
     # Styling function
     def style_status(val):
         if val.lower() == 'ok':
-            return 'background-color: #d1fae5; color: #065f46; font-weight: 600; border-radius: 20px; padding: 2px 8px;'
+            return 'background-color: #d1fae5; color: #065f46; font-weight: 600; border-radius: 20px; padding: 2px 8px; display: inline-block;'
         elif val.lower() == 'pending':
-            return 'background-color: #fed7aa; color: #92400e; font-weight: 600; border-radius: 20px; padding: 2px 8px;'
+            return 'background-color: #fed7aa; color: #92400e; font-weight: 600; border-radius: 20px; padding: 2px 8px; display: inline-block;'
         elif val.lower() == 'ng':
-            return 'background-color: #fee2e2; color: #991b1b; font-weight: 600; border-radius: 20px; padding: 2px 8px;'
+            return 'background-color: #fee2e2; color: #991b1b; font-weight: 600; border-radius: 20px; padding: 2px 8px; display: inline-block;'
         return ''
     
     def style_days(val):
@@ -671,10 +671,12 @@ def main():
                 pass
         return ''
     
+    # Apply styling
     styled_df = display_df.style.applymap(style_status, subset=['Staus'])
     styled_df = styled_df.applymap(style_days, subset=['Days Left'])
     
-    st.dataframe(styled_df, use_container_width=True, height=400)
+    # Shorten table size
+    st.dataframe(styled_df, use_container_width=True, height=350)
     
     # Settings Expander
     with st.expander("⚙️ Email Settings"):
@@ -684,7 +686,7 @@ def main():
             if new_primary != st.session_state.primary_recipient:
                 st.session_state.primary_recipient = new_primary
         with col_set2:
-            cc_text = st.text_area("CC Recipients", value="\n".join(st.session_state.cc_recipients), height=80)
+            cc_text = st.text_area("CC Recipients (one per line)", value="\n".join(st.session_state.cc_recipients), height=80)
             if st.button("💾 Save Settings"):
                 st.session_state.cc_recipients = [e.strip() for e in cc_text.split("\n") if e.strip()]
                 st.success("Settings saved!")
