@@ -42,7 +42,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Arial Narrow font
+# Custom CSS for Arial Narrow font and colors
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Arial+Narrow:wght@400;700&display=swap');
@@ -93,6 +93,25 @@ st.markdown("""
     .stButton button {
         font-family: 'Arial Narrow', 'Arial', sans-serif !important;
         font-weight: bold !important;
+    }
+    
+    /* Alert banners styling */
+    .critical-alert {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 5px 0;
+        font-size: 0.9rem;
+    }
+    
+    .urgent-alert {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 5px 0;
+        font-size: 0.9rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -220,6 +239,12 @@ def process_data(df):
         return '🟢 On Track'
 
     df['Alert Status'] = df.apply(get_alert_status, axis=1)
+    
+    # Clean data - remove rows with empty Model or Status
+    df = df.dropna(subset=['Model', 'Staus'])
+    df = df[df['Model'].astype(str).str.strip() != '']
+    df = df[df['Staus'].astype(str).str.strip() != '']
+    
     return df
 
 
@@ -274,10 +299,10 @@ def send_email_alert(df, primary_recipient, cc_recipients):
 
 
 def generate_email_html(due_records, overdue_records):
-    headers = "<table" + "".join(
+    headers = "</table>" + "".join(
         f"<th>{h}</th>" for h in
         ["Model", "Validation Date", "Revalidation Due", "Days Left", "Status", "Incharge", "Alert"]
-    ) + "</tr>"
+    ) + " </thead>"
 
     def make_row(row, bg, days_text, badge):
         return (f'<tr style="background-color:{bg};">'
@@ -325,9 +350,9 @@ def generate_email_html(due_records, overdue_records):
         Please take necessary action immediately.
     </div>
     <h3>🔴 OVERDUE SAMPLES:</h3>
-    <table><thead>{headers}</thead><tbody>{over_rows}</tbody></table>
+    <table><thead>{headers}<tbody>{over_rows}</tbody></table>
     <h3>⚠️ SAMPLES DUE WITHIN 3 DAYS:</h3>
-    <table><thead>{headers}</thead><tbody>{due_rows}</tbody></table>
+    <table><thead>{headers}<tbody>{due_rows}</tbody></table>
     <div class="footer">
         <p><i>Automated alert – Golden Sample Tracker System</i></p>
         <p>Generated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}</p>
@@ -368,14 +393,19 @@ def check_and_send_auto_email(df):
 def create_status_chart(df):
     counts = df['Staus'].value_counts()
     
-    # Blue to black gradient colors
-    colors = ['#1e3c72', '#2a5298', '#3a6ea5']
+    # Colors for status - Red for NG, Green for OK, Yellow for Pending
+    color_map = {
+        'OK': '#28a745',
+        'Pending': '#ffc107',
+        'NG': '#dc3545'
+    }
+    colors = [color_map.get(status, '#1e3c72') for status in counts.index]
     
     fig = go.Figure(data=[go.Pie(
         labels=counts.index,
         values=counts.values,
         hole=0.5,
-        marker_colors=colors[:len(counts)],
+        marker_colors=colors,
         textinfo='label+percent',
         textposition='outside',
         textfont=dict(family='Arial Narrow', size=12, weight='bold')
@@ -383,7 +413,7 @@ def create_status_chart(df):
     
     fig.update_layout(
         title=dict(text="Status Distribution", font=dict(family='Arial Narrow', size=16, weight='bold')),
-        height=450,
+        height=400,
         showlegend=True,
         legend=dict(font=dict(family='Arial Narrow', size=11)),
         margin=dict(l=20, r=20, t=50, b=20)
@@ -401,7 +431,7 @@ def create_urgency_chart(df):
                           font=dict(family='Arial Narrow', size=14))
         fig.update_layout(
             title=dict(text="Samples by Urgency Level", font=dict(family='Arial Narrow', size=16, weight='bold')),
-            height=450
+            height=400
         )
         return fig
 
@@ -419,12 +449,12 @@ def create_urgency_chart(df):
     alert_df['Category'] = alert_df['Days Left'].apply(cat)
     counts = alert_df['Category'].value_counts()
     
-    # Blue to black gradient for bar chart
+    # Blue gradient for urgency chart
     color_map = {
-        'Overdue': '#0a1c3a',
-        'Urgent (0-3 days)': '#1e3c72',
-        'Due Soon (4-7 days)': '#2a5298',
-        'On Track (>7 days)': '#3a6ea5',
+        'Overdue': '#dc3545',
+        'Urgent (0-3 days)': '#ffc107',
+        'Due Soon (4-7 days)': '#17a2b8',
+        'On Track (>7 days)': '#28a745',
         'Unknown': '#6c757d'
     }
     
@@ -445,7 +475,7 @@ def create_urgency_chart(df):
                    tickfont=dict(family='Arial Narrow', size=11)),
         yaxis=dict(title="Number of Samples", title_font=dict(family='Arial Narrow', size=12, weight='bold'),
                    tickfont=dict(family='Arial Narrow', size=11)),
-        height=450,
+        height=400,
         showlegend=False,
         margin=dict(l=20, r=20, t=50, b=50)
     )
@@ -499,12 +529,6 @@ def main():
         st.metric("🔴 Urgent", urgent_count)
     with col6:
         st.metric("⚠️ Overdue", overdue_count, delta="ACTION!" if overdue_count > 0 else None)
-    
-    # Alert banners
-    if overdue_count > 0:
-        st.error(f"🔴 **CRITICAL ALERT:** {overdue_count} sample(s) are OVERDUE for revalidation! Immediate action required!")
-    if urgent_count > 0:
-        st.warning(f"⚠️ **URGENT ALERT:** {urgent_count} sample(s) require revalidation within 3 days!")
     
     # Charts and Table - Left side charts, Right side table
     col_left, col_right = st.columns([0.45, 0.55])
@@ -568,12 +592,7 @@ def main():
             else:
                 filtered_df = filtered_df.sort_values(sort_by, ascending=True)
         
-        # Remove blank rows (rows with missing critical data)
-        filtered_df = filtered_df.dropna(subset=['Model', 'Staus'])
-        filtered_df = filtered_df[filtered_df['Model'] != '']
-        filtered_df = filtered_df[filtered_df['Staus'] != '']
-        
-        # Display table
+        # Display table with color coding
         display_cols = ['Model', 'Validation Date Display', 'Revalidation Due Display', 
                         'Days Left', 'Staus', 'Incharge', 'Alert Status']
         
@@ -586,22 +605,51 @@ def main():
             lambda x: f"{int(x)} days" if x != '-' and pd.notna(x) and x != '-' else '-'
         )
         
-        # Color code rows
-        def highlight_row(row):
-            if 'Days Left' in row and row['Days Left'] != '-':
+        # Color code rows based on Status (Red for NG, Green for OK, Yellow for Pending)
+        def color_status(val):
+            if val == 'OK' or val == 'Ok' or val == 'ok':
+                return 'background-color: #d4edda; color: #155724'
+            elif val == 'Pending' or val == 'pending':
+                return 'background-color: #fff3cd; color: #856404'
+            elif val == 'NG' or val == 'Ng' or val == 'ng':
+                return 'background-color: #f8d7da; color: #721c24'
+            return ''
+        
+        # Apply styling to Status column
+        styled_df = display_df.style.applymap(color_status, subset=['Staus'])
+        
+        # Also highlight Days Left for urgency
+        def highlight_days_left(val):
+            if val != '-' and 'days' in str(val):
                 try:
-                    days = int(row['Days Left'].split()[0])
+                    days = int(str(val).split()[0])
                     if days < 0:
-                        return ['background-color: #f8d7da'] * len(row)
+                        return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
                     elif days <= 3:
-                        return ['background-color: #fff3cd'] * len(row)
+                        return 'background-color: #fff3cd; color: #856404; font-weight: bold'
                 except:
                     pass
-            return [''] * len(row)
+            return ''
         
-        styled_df = display_df.style.apply(highlight_row, axis=1)
+        styled_df = styled_df.applymap(highlight_days_left, subset=['Days Left'])
         
         st.dataframe(styled_df, use_container_width=True, height=450)
+        
+        # Compact Alerts below table
+        st.markdown("---")
+        col_alert1, col_alert2 = st.columns(2)
+        
+        with col_alert1:
+            if overdue_count > 0:
+                st.markdown(f'<div class="critical-alert">🔴 <strong>CRITICAL:</strong> {overdue_count} sample(s) OVERDUE for revalidation! Immediate action required!</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="critical-alert" style="background-color:#d4edda; border-left-color:#28a745;">✅ <strong>Good:</strong> No overdue samples</div>', unsafe_allow_html=True)
+        
+        with col_alert2:
+            if urgent_count > 0:
+                st.markdown(f'<div class="urgent-alert">⚠️ <strong>URGENT:</strong> {urgent_count} sample(s) require revalidation within 3 days!</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="urgent-alert" style="background-color:#d4edda; border-left-color:#28a745;">✅ <strong>Good:</strong> No urgent samples due within 3 days</div>', unsafe_allow_html=True)
         
         # Action buttons
         col1, col2, col3, col4 = st.columns(4)
