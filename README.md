@@ -3,56 +3,95 @@
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-app-url.streamlit.app)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-A professional dashboard for tracking golden sample revalidations with automated email alerts and real-time monitoring.
+> A professional dashboard for tracking golden sample revalidations with automated email alerts and real-time monitoring.
+
+## 📌 Table of Contents
+- [Overview](#-overview)
+- [Key Features](#-key-features)
+- [Live Demo](#-live-demo)
+- [Screenshots](#-screenshots)
+- [Technology Stack](#-technology-stack)
+- [Quick Start](#-quick-start)
+- [Configuration](#-configuration)
+- [Data Source](#-data-source)
+- [Project Structure](#-project-structure)
+- [Deployment](#-deployment)
+- [Customization](#-customization)
+- [Troubleshooting](#-troubleshooting)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ## 📊 Overview
 
-The Golden Sample Revalidation Tracker is a comprehensive monitoring solution designed for manufacturing and quality control environments. It helps track sample validation dates, sends automated reminders for revalidations, and provides real-time insights into sample status across your organization.
+The **Golden Sample Revalidation Tracker** is a comprehensive monitoring solution designed for manufacturing and quality control environments. It helps track sample validation dates, sends automated reminders for revalidations, and provides real-time insights into sample status across your organization.
 
-### Key Features
+### 🎯 Use Cases
+- **Manufacturing Quality Control**: Track sample revalidation cycles
+- **Laboratory Management**: Monitor test sample expiration dates
+- **Asset Management**: Track equipment calibration schedules
+- **Compliance Tracking**: Ensure regulatory compliance for sample validation
 
-- **📈 Real-time Dashboard** - Interactive visualizations of sample status and urgency levels
-- **📧 Automated Email Alerts** - Daily notifications for samples requiring attention
-- **🔔 Critical & Urgent Alerts** - Visual indicators for overdue and urgent samples
-- **📊 Data Visualization** - Donut and bar charts for status distribution analysis
-- **🔍 Advanced Filtering** - Filter by status, urgency, and search by model name
+## ✨ Key Features
+
+### Core Functionality
+- **📈 Real-time Dashboard** - Interactive visualizations with 6 key metrics
+- **📧 Automated Email Alerts** - Daily notifications at 9:00 AM
+- **🔔 Critical & Urgent Alerts** - Visual indicators for immediate attention
+- **📊 Data Visualization** - Interactive donut and bar charts
+- **🔍 Advanced Filtering** - Filter by status, urgency, and model search
 - **📥 Data Export** - Export filtered data to CSV format
-- **📱 Responsive Design** - Works seamlessly on desktop and tablet devices
+- **📱 Responsive Design** - Works on desktop, tablet, and mobile
+
+### Technical Highlights
+- **Smart Deduplication** - Prevents duplicate email alerts
+- **Persistent State** - Maintains email history across sessions
+- **Auto-Refresh** - Configurable data refresh (30-300 seconds)
+- **Error Handling** - Graceful failure handling with user feedback
+- **Real-time Calculations** - Automatic day calculations for revalidations
 
 ## 🚀 Live Demo
 
-Check out the live application: [Golden Sample Tracker](https://your-app-url.streamlit.app)
+Experience the application live: [Golden Sample Tracker](https://your-app-url.streamlit.app)
+
+*Demo credentials available upon request*
 
 ## 📸 Screenshots
 
 ### Dashboard Overview
 ![Dashboard Overview](screenshots/dashboard.png)
+*Main dashboard showing metrics, charts, and controls*
 
 ### Sample Details Table
 ![Sample Details](screenshots/table.png)
+*Filterable table with color-coded status indicators*
 
 ### Email Alert Example
 ![Email Alert](screenshots/email.png)
+*Automated email notification with sample details*
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Streamlit
-- **Data Processing**: Pandas
-- **Visualization**: Plotly
-- **Email**: SMTP (Gmail)
-- **Date Handling**: Python datetime, dateutil
-- **Deployment**: Streamlit Cloud / GitHub
+| Category | Technology | Purpose |
+|----------|------------|---------|
+| **Frontend** | Streamlit 1.35.0 | Interactive web interface |
+| **Data Processing** | Pandas 2.2.2 | Data manipulation and analysis |
+| **Visualization** | Plotly 5.24.1 | Interactive charts and graphs |
+| **Email** | SMTP + Gmail | Automated email notifications |
+| **Date Handling** | Python datetime, dateutil | Date parsing and calculations |
+| **Deployment** | Streamlit Cloud | Cloud hosting |
 
-## 📋 Prerequisites
+## 🚀 Quick Start
 
+### Prerequisites
 - Python 3.8 or higher
 - Gmail account with App Password enabled
-- Google Sheets (public access for data source)
+- Git (for cloning)
 
-## 🔧 Installation
-
-### Local Development
+### Installation
 
 1. **Clone the repository**
 ```bash
