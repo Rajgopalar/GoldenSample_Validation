@@ -91,27 +91,6 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
     
-    /* Alert Banners - Compact */
-    .alert-critical {
-        background: linear-gradient(135deg, #fef3f2 0%, #fff5f5 100%);
-        border-left: 3px solid #dc2626;
-        padding: 0.5rem 0.8rem;
-        border-radius: 6px;
-        margin: 0.5rem 0;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-    
-    .alert-urgent {
-        background: linear-gradient(135deg, #fffbeb 0%, #fff9e6 100%);
-        border-left: 3px solid #f59e0b;
-        padding: 0.5rem 0.8rem;
-        border-radius: 6px;
-        margin: 0.5rem 0;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-    
     .alert-success {
         background: linear-gradient(135deg, #f0fdf4 0%, #f3fef7 100%);
         border-left: 3px solid #10b981;
