@@ -601,15 +601,7 @@ def main():
         if st.button("🔄 Refresh", use_container_width=True, key="refresh_btn"):
             st.cache_data.clear()
             st.rerun()
-    
-    # Critical & Urgent Alerts (Between Control Bar and Table)
-    if overdue_count > 0:
-        st.markdown(f'<div class="alert-critical">🔴 <strong>CRITICAL ALERT:</strong> {overdue_count} sample(s) are OVERDUE for revalidation! Immediate action required!</div>', unsafe_allow_html=True)
-    if urgent_count > 0:
-        st.markdown(f'<div class="alert-urgent">⚠️ <strong>URGENT ALERT:</strong> {urgent_count} sample(s) require revalidation within 3 days! Please check the table below.</div>', unsafe_allow_html=True)
-    if overdue_count == 0 and urgent_count == 0:
-        st.markdown('<div class="alert-success">✅ <strong>All Good:</strong> No urgent or overdue samples found!</div>', unsafe_allow_html=True)
-    
+  
     # Apply filters
     if status_filter == 'All':
         filtered_df = df.copy()
