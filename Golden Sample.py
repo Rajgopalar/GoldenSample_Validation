@@ -95,61 +95,65 @@ st.markdown("""
     .alert-critical {
         background: linear-gradient(135deg, #fef3f2 0%, #fff5f5 100%);
         border-left: 3px solid #dc2626;
-        padding: 0.4rem 0.8rem;
+        padding: 0.5rem 0.8rem;
         border-radius: 6px;
-        margin: 0;
-        font-size: 0.8rem;
+        margin: 0.5rem 0;
+        font-size: 0.85rem;
+        font-weight: 500;
     }
     
     .alert-urgent {
         background: linear-gradient(135deg, #fffbeb 0%, #fff9e6 100%);
         border-left: 3px solid #f59e0b;
-        padding: 0.4rem 0.8rem;
+        padding: 0.5rem 0.8rem;
         border-radius: 6px;
-        margin: 0;
-        font-size: 0.8rem;
+        margin: 0.5rem 0;
+        font-size: 0.85rem;
+        font-weight: 500;
     }
     
     .alert-success {
         background: linear-gradient(135deg, #f0fdf4 0%, #f3fef7 100%);
         border-left: 3px solid #10b981;
-        padding: 0.4rem 0.8rem;
+        padding: 0.5rem 0.8rem;
         border-radius: 6px;
-        margin: 0;
-        font-size: 0.8rem;
+        margin: 0.5rem 0;
+        font-size: 0.85rem;
+        font-weight: 500;
     }
     
     /* Control Bar */
     .control-bar {
         background: #f8f9fa;
-        padding: 0.5rem 1rem;
+        padding: 0.8rem 1rem;
         border-radius: 10px;
-        margin: 0.5rem 0;
+        margin: 0.5rem 0 1rem 0;
         border: 1px solid #e9ecef;
     }
     
     .stButton button {
         border-radius: 8px !important;
         font-weight: 500 !important;
-        padding: 0.3rem 0.8rem !important;
+        padding: 0.4rem 0.8rem !important;
         font-size: 0.8rem !important;
         transition: all 0.2s !important;
     }
     
-    .stSelectbox label, .stMultiselect label, .stTextInput label {
-        font-size: 0.7rem !important;
-        font-weight: 500 !important;
+    .stSelectbox label, .stTextInput label {
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
         margin-bottom: 0.2rem !important;
     }
     
-    .stSelectbox, .stMultiselect, .stTextInput {
-        font-size: 0.8rem !important;
+    .stSelectbox, .stTextInput {
+        font-size: 0.85rem !important;
     }
     
     .stDataFrame {
         border-radius: 10px;
         overflow: hidden;
         border: 1px solid #e9ecef;
+        margin-top: 0.5rem;
     }
     
     .chart-container {
@@ -163,6 +167,14 @@ st.markdown("""
     hr {
         margin: 0.5rem 0;
         border-color: #e9ecef;
+    }
+    
+    /* Section Title */
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0.5rem 0;
+        color: #1f2937;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -362,13 +374,13 @@ def generate_email_html(due_records, overdue_records):
 
     def make_row(row, bg, days_text, badge):
         return f'<tr style="background-color:{bg};">' + ''.join([
-            f'<td style="padding:6px;"><b>{row.get("Model","")}</b></td>',
-            f'<td style="padding:6px;">{row.get("Validation Date Display","")}</td>',
-            f'<td style="padding:6px;">{row.get("Revalidation Due Display","")}</td>',
-            f'<td style="padding:6px;color:#dc3545;">{days_text}</td>',
-            f'<td style="padding:6px;"><b>{row.get("Staus","")}</b></td>',
-            f'<td style="padding:6px;">{row.get("Incharge","")}</td>',
-            f'<td style="padding:6px;color:#dc3545;">{badge}</td>',
+            f'<td style="padding:6px;"><b>{row.get("Model","")}</b>\\n</td>',
+            f'<td style="padding:6px;">{row.get("Validation Date Display","")}\\n</td>',
+            f'<td style="padding:6px;">{row.get("Revalidation Due Display","")}\\n</td>',
+            f'<td style="padding:6px;color:#dc3545;">{days_text}\\n</td>',
+            f'<td style="padding:6px;"><b>{row.get("Staus","")}</b>\\n</td>',
+            f'<td style="padding:6px;">{row.get("Incharge","")}\\n</td>',
+            f'<td style="padding:6px;color:#dc3545;">{badge}\\n</td>',
         ]) + '</tr>'
 
     over_rows = "".join(make_row(r, "#fef3f2", f"{abs(int(r['Days Left']))}d overdue", "🔴 OVERDUE") 
@@ -567,23 +579,18 @@ def main():
     with col_chart2:
         st.plotly_chart(create_urgency_chart(df), use_container_width=True, config={'displayModeBar': False})
     
-    # Alerts above table (compact)
-    if overdue_count > 0:
-        st.markdown(f'<div class="alert-critical">🔴 <strong>Critical Alert:</strong> {overdue_count} sample(s) are OVERDUE for revalidation!</div>', unsafe_allow_html=True)
-    if urgent_count > 0:
-        st.markdown(f'<div class="alert-urgent">⚠️ <strong>Urgent Alert:</strong> {urgent_count} sample(s) require revalidation within 3 days!</div>', unsafe_allow_html=True)
-    
     # Control Bar - Filters, Search, Export on Top
     st.markdown("### 📋 Sample Details")
     
-    # Compact Control Row
+    # Control Row (Top)
     control_cols = st.columns([1.5, 1.5, 2, 1, 1, 1])
     
     with control_cols[0]:
-        status_filter = st.multiselect(
+        # Changed from multiselect to selectbox (dropdown)
+        status_filter = st.selectbox(
             "Status",
-            options=['Ok', 'Pending', 'Ng'],
-            default=['Ok', 'Pending', 'Ng'],
+            options=['All', 'Ok', 'Pending', 'Ng'],
+            index=0,
             key="status_filter"
         )
     
@@ -616,8 +623,19 @@ def main():
             st.cache_data.clear()
             st.rerun()
     
+    # Critical & Urgent Alerts (Between Control Bar and Table)
+    if overdue_count > 0:
+        st.markdown(f'<div class="alert-critical">🔴 <strong>CRITICAL ALERT:</strong> {overdue_count} sample(s) are OVERDUE for revalidation! Immediate action required!</div>', unsafe_allow_html=True)
+    if urgent_count > 0:
+        st.markdown(f'<div class="alert-urgent">⚠️ <strong>URGENT ALERT:</strong> {urgent_count} sample(s) require revalidation within 3 days! Please check the table below.</div>', unsafe_allow_html=True)
+    if overdue_count == 0 and urgent_count == 0:
+        st.markdown('<div class="alert-success">✅ <strong>All Good:</strong> No urgent or overdue samples found!</div>', unsafe_allow_html=True)
+    
     # Apply filters
-    filtered_df = df[df['Staus'].isin(status_filter)]
+    if status_filter == 'All':
+        filtered_df = df.copy()
+    else:
+        filtered_df = df[df['Staus'] == status_filter]
     
     if urgency_filter == 'Overdue':
         filtered_df = filtered_df[filtered_df['Days Left'] < 0]
@@ -675,8 +693,8 @@ def main():
     styled_df = display_df.style.applymap(style_status, subset=['Staus'])
     styled_df = styled_df.applymap(style_days, subset=['Days Left'])
     
-    # Shorten table size
-    st.dataframe(styled_df, use_container_width=True, height=350)
+    # Table with shortened height
+    st.dataframe(styled_df, use_container_width=True, height=400)
     
     # Settings Expander
     with st.expander("⚙️ Email Settings"):
