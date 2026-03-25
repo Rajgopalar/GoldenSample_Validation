@@ -9,7 +9,6 @@ import warnings
 import time
 import os
 import json
-import hashlib
 
 warnings.filterwarnings('ignore')
 
@@ -27,7 +26,7 @@ CC_RECIPIENTS = [
     "rajgopal.padget@dixoninfo.com",
 ]
 
-# Auto email settings - ONE EMAIL PER DAY AT 9 AM
+# Auto email settings - ONE EMAIL PER DAY
 AUTO_EMAIL_HOUR = 9
 AUTO_EMAIL_MINUTE = 0
 AUTO_EMAIL_ENABLED = True
@@ -40,46 +39,60 @@ st.set_page_config(
     page_title="Golden Sample Revalidation Tracker",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"  # Collapsed sidebar to save space
+    initial_sidebar_state="expanded"
 )
 
-# Custom CSS for compact layout
+# Custom CSS for Arial Narrow font
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Arial+Narrow:wght@400;700&display=swap');
+    
+    * {
+        font-family: 'Arial Narrow', 'Arial', sans-serif !important;
+    }
+    
     .main-header {
         background: linear-gradient(90deg, #1e3c72, #2a5298);
-        padding: 0.5rem;
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
     }
+    
     .main-header h1 {
-        font-size: 1.5rem !important;
+        font-family: 'Arial Narrow', 'Arial', sans-serif !important;
+        font-weight: bold !important;
+        font-size: 2rem !important;
+        color: white !important;
         margin: 0 !important;
-        padding: 0 !important;
     }
+    
     .stMetric {
         background-color: #f0f2f6;
-        padding: 8px;
+        padding: 10px;
         border-radius: 8px;
+        text-align: center;
     }
+    
     div[data-testid="stMetric"] {
         background-color: #f0f2f6;
-        padding: 8px;
+        padding: 10px;
         border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
+    
+    div[data-testid="stMetric"] label {
+        font-weight: bold !important;
+        font-family: 'Arial Narrow', 'Arial', sans-serif !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Arial Narrow', 'Arial', sans-serif !important;
+        font-weight: bold !important;
+    }
+    
     .stButton button {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.8rem;
-    }
-    .compact-table {
-        font-size: 0.8rem;
-    }
-    .status-badge {
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        font-weight: bold;
-        display: inline-block;
+        font-family: 'Arial Narrow', 'Arial', sans-serif !important;
+        font-weight: bold !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -97,26 +110,20 @@ if 'df' not in st.session_state:
     st.session_state.df = None
 
 # ─────────────────────────────────────────────────────────────
-#  PERSISTENT STATE (SINGLE EMAIL PER DAY)
+#  PERSISTENT STATE
 # ─────────────────────────────────────────────────────────────
 
 def _load_state() -> dict:
-    """Load persistent state"""
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r") as f:
                 return json.load(f)
     except Exception:
         pass
-    return {
-        "last_sent_date": None,
-        "last_sent_time": None,
-        "email_sent_today": False
-    }
+    return {"last_sent_date": None, "last_sent_time": None}
 
 
 def _save_state(state: dict):
-    """Save persistent state"""
     try:
         with open(STATE_FILE, "w") as f:
             json.dump(state, f)
@@ -125,19 +132,16 @@ def _save_state(state: dict):
 
 
 def _should_send_email_today() -> bool:
-    """Check if email should be sent today"""
     state = _load_state()
     today = datetime.now().strftime("%Y-%m-%d")
     return state.get("last_sent_date") != today
 
 
 def _mark_email_sent():
-    """Mark that email has been sent today"""
     state = _load_state()
     now = datetime.now()
     state["last_sent_date"] = now.strftime("%Y-%m-%d")
     state["last_sent_time"] = now.strftime("%Y-%m-%d %H:%M:%S")
-    state["email_sent_today"] = True
     _save_state(state)
     st.session_state.email_sent_today = True
     st.session_state.last_email_date = now
@@ -236,7 +240,6 @@ def get_overdue_records(df):
 # ─────────────────────────────────────────────────────────────
 
 def send_email_alert(df, primary_recipient, cc_recipients):
-    """Send a single email with primary in TO and others in CC"""
     due_records = get_due_records(df)
     overdue_records = get_overdue_records(df)
 
@@ -271,7 +274,7 @@ def send_email_alert(df, primary_recipient, cc_recipients):
 
 
 def generate_email_html(due_records, overdue_records):
-    headers = "<tr>" + "".join(
+    headers = "<table" + "".join(
         f"<th>{h}</th>" for h in
         ["Model", "Validation Date", "Revalidation Due", "Days Left", "Status", "Incharge", "Alert"]
     ) + "</tr>"
@@ -301,14 +304,14 @@ def generate_email_html(due_records, overdue_records):
     return f"""<html>
 <head>
     <style>
-        body{{font-family:Arial,sans-serif;line-height:1.6;margin:0;padding:20px;}}
+        body{{font-family:'Arial Narrow',Arial,sans-serif;line-height:1.6;margin:0;padding:20px;}}
         .header{{background:linear-gradient(90deg,#1e3c72,#2a5298);color:white;padding:15px;text-align:center;border-radius:8px;}}
         .alert{{background:#f8d7da;border-left:4px solid #dc3545;padding:12px;margin:15px 0;border-radius:4px;}}
         table{{border-collapse:collapse;width:100%;margin:15px 0;}}
-        th{{background:#2a5298;color:white;padding:10px;text-align:left;}}
+        th{{background:#2a5298;color:white;padding:10px;text-align:left;font-weight:bold;}}
         td{{padding:8px;border-bottom:1px solid #ddd;}}
         .footer{{margin-top:20px;padding:12px;background:#f8f9fa;text-align:center;border-radius:4px;font-size:12px;}}
-        h3{{margin:10px 0;font-size:16px;}}
+        h3{{margin:10px 0;font-size:16px;font-weight:bold;}}
     </style>
 </head>
 <body>
@@ -334,17 +337,11 @@ def generate_email_html(due_records, overdue_records):
 
 
 def check_and_send_auto_email(df):
-    """Check if it's 9 AM and send email (ONCE PER DAY)"""
     if not AUTO_EMAIL_ENABLED:
         return False, "Auto email disabled"
     
     now = datetime.now()
-    current_hour = now.hour
-    current_minute = now.minute
-    
-    # Check if it's exactly 9:00 AM
-    if current_hour == AUTO_EMAIL_HOUR and current_minute == AUTO_EMAIL_MINUTE:
-        # Check if email already sent today
+    if now.hour == AUTO_EMAIL_HOUR and now.minute == AUTO_EMAIL_MINUTE:
         if not _should_send_email_today():
             return False, "Email already sent today"
         
@@ -352,89 +349,135 @@ def check_and_send_auto_email(df):
         over = get_overdue_records(df)
         
         if due.empty and over.empty:
-            # No urgent samples - still mark as sent to avoid repeated checks
             _mark_email_sent()
             return False, "No urgent samples found"
         
-        # Send email
         success, msg = send_email_alert(df, st.session_state.primary_recipient, st.session_state.cc_recipients)
-        
         if success:
             _mark_email_sent()
             return True, f"✅ Auto email sent at {now.strftime('%H:%M:%S')}"
-        else:
-            return False, msg
+        return False, msg
     
     return False, "Not time yet"
 
 
 # ─────────────────────────────────────────────────────────────
-#  CHARTS (Compact)
+#  CHARTS (with blue/black gradient)
 # ─────────────────────────────────────────────────────────────
 
 def create_status_chart(df):
     counts = df['Staus'].value_counts()
+    
+    # Blue to black gradient colors
+    colors = ['#1e3c72', '#2a5298', '#3a6ea5']
+    
     fig = go.Figure(data=[go.Pie(
-        labels=counts.index, values=counts.values, hole=0.5,
-        marker_colors=['#28a745', '#ffc107', '#dc3545'],
-        textinfo='label+percent', textposition='outside'
+        labels=counts.index,
+        values=counts.values,
+        hole=0.5,
+        marker_colors=colors[:len(counts)],
+        textinfo='label+percent',
+        textposition='outside',
+        textfont=dict(family='Arial Narrow', size=12, weight='bold')
     )])
-    fig.update_layout(title="Status Distribution", height=300, margin=dict(l=20, r=20, t=40, b=20))
+    
+    fig.update_layout(
+        title=dict(text="Status Distribution", font=dict(family='Arial Narrow', size=16, weight='bold')),
+        height=450,
+        showlegend=True,
+        legend=dict(font=dict(family='Arial Narrow', size=11)),
+        margin=dict(l=20, r=20, t=50, b=20)
+    )
     return fig
 
 
 def create_urgency_chart(df):
+    # Filter non-OK samples
     alert_df = df[df['Staus'].str.lower() != 'ok'].copy()
+    
     if alert_df.empty:
         fig = go.Figure()
-        fig.add_annotation(text="No pending samples", x=0.5, y=0.5, showarrow=False)
-        fig.update_layout(title="Samples by Urgency", height=300, margin=dict(l=20, r=20, t=40, b=20))
+        fig.add_annotation(text="No pending samples", x=0.5, y=0.5, showarrow=False,
+                          font=dict(family='Arial Narrow', size=14))
+        fig.update_layout(
+            title=dict(text="Samples by Urgency Level", font=dict(family='Arial Narrow', size=16, weight='bold')),
+            height=450
+        )
         return fig
 
     def cat(d):
-        if pd.isna(d): return 'Unknown'
-        if d < 0: return 'Overdue'
-        if d <= 3: return 'Urgent (0-3)'
-        if d <= 7: return 'Due Soon (4-7)'
-        return 'On Track'
+        if pd.isna(d):
+            return 'Unknown'
+        if d < 0:
+            return 'Overdue'
+        if d <= 3:
+            return 'Urgent (0-3 days)'
+        if d <= 7:
+            return 'Due Soon (4-7 days)'
+        return 'On Track (>7 days)'
 
-    alert_df['Cat'] = alert_df['Days Left'].apply(cat)
-    counts = alert_df['Cat'].value_counts()
-    cmap = {'Overdue': '#dc3545', 'Urgent (0-3)': '#ff6b6b', 'Due Soon (4-7)': '#ffc107', 'On Track': '#28a745'}
+    alert_df['Category'] = alert_df['Days Left'].apply(cat)
+    counts = alert_df['Category'].value_counts()
+    
+    # Blue to black gradient for bar chart
+    color_map = {
+        'Overdue': '#0a1c3a',
+        'Urgent (0-3 days)': '#1e3c72',
+        'Due Soon (4-7 days)': '#2a5298',
+        'On Track (>7 days)': '#3a6ea5',
+        'Unknown': '#6c757d'
+    }
+    
+    colors = [color_map.get(cat, '#6c757d') for cat in counts.index]
     
     fig = go.Figure(data=[go.Bar(
-        x=counts.index, y=counts.values,
-        marker_color=[cmap.get(c, '#6c757d') for c in counts.index],
-        text=counts.values, textposition='auto'
+        x=counts.index,
+        y=counts.values,
+        marker_color=colors,
+        text=counts.values,
+        textposition='auto',
+        textfont=dict(family='Arial Narrow', size=12, weight='bold')
     )])
-    fig.update_layout(title="Samples by Urgency", xaxis_title="Urgency Level", 
-                      yaxis_title="Count", height=300, margin=dict(l=20, r=20, t=40, b=20))
+    
+    fig.update_layout(
+        title=dict(text="Samples by Urgency Level", font=dict(family='Arial Narrow', size=16, weight='bold')),
+        xaxis=dict(title="Urgency Level", title_font=dict(family='Arial Narrow', size=12, weight='bold'),
+                   tickfont=dict(family='Arial Narrow', size=11)),
+        yaxis=dict(title="Number of Samples", title_font=dict(family='Arial Narrow', size=12, weight='bold'),
+                   tickfont=dict(family='Arial Narrow', size=11)),
+        height=450,
+        showlegend=False,
+        margin=dict(l=20, r=20, t=50, b=50)
+    )
     return fig
 
 
 # ─────────────────────────────────────────────────────────────
-#  MAIN (Compact Dashboard)
+#  MAIN
 # ─────────────────────────────────────────────────────────────
 
 def main():
-    # Compact Header
-    st.markdown('<div class="main-header"><h1 style="color:white;text-align:center;">📊 Golden Sample Revalidation Tracker</h1></div>', unsafe_allow_html=True)
+    # Header
+    st.markdown('<div class="main-header"><h1 style="text-align:center;">📊 Golden Sample Revalidation Tracker</h1></div>', unsafe_allow_html=True)
     
     # Load data
-    with st.spinner("Loading..."):
+    with st.spinner("Loading data..."):
         df_raw = fetch_data()
         df = process_data(df_raw)
     
     if df is None or df.empty:
-        st.error("No valid data available. Check: 'Validation Date', 'Staus', 'Model' | Format: DD-MM-YYYY")
+        st.error("No valid data available. Please check:")
+        st.info("Required columns: 'Validation Date', 'Staus', 'Model' | Date format: DD-MM-YYYY")
         return
     
     st.session_state.df = df
     
     # Check and send auto email (ONCE PER DAY at 9 AM)
     auto_sent, auto_msg = check_and_send_auto_email(df)
+    if auto_sent:
+        st.toast(auto_msg, icon="✅")
     
-    # ── Compact Metrics Row ──────────────────────────────────
+    # Metrics Row
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     
     total = len(df)
@@ -445,7 +488,7 @@ def main():
     overdue_count = len(get_overdue_records(df))
     
     with col1:
-        st.metric("Total", total)
+        st.metric("Total Samples", total)
     with col2:
         st.metric("✅ OK", ok_count)
     with col3:
@@ -457,84 +500,141 @@ def main():
     with col6:
         st.metric("⚠️ Overdue", overdue_count, delta="ACTION!" if overdue_count > 0 else None)
     
-    # Alert banners (compact)
+    # Alert banners
     if overdue_count > 0:
-        st.error(f"🔴 **CRITICAL:** {overdue_count} sample(s) OVERDUE!")
+        st.error(f"🔴 **CRITICAL ALERT:** {overdue_count} sample(s) are OVERDUE for revalidation! Immediate action required!")
     if urgent_count > 0:
-        st.warning(f"⚠️ **URGENT:** {urgent_count} sample(s) due within 3 days!")
+        st.warning(f"⚠️ **URGENT ALERT:** {urgent_count} sample(s) require revalidation within 3 days!")
     
-    # ── Charts Row (Compact) ─────────────────────────────────
-    c1, c2 = st.columns(2)
-    with c1:
-        st.plotly_chart(create_status_chart(df), use_container_width=True, config={'displayModeBar': False})
-    with c2:
-        st.plotly_chart(create_urgency_chart(df), use_container_width=True, config={'displayModeBar': False})
+    # Charts and Table - Left side charts, Right side table
+    col_left, col_right = st.columns([0.45, 0.55])
     
-    # ── Compact Table with Filters ───────────────────────────
-    st.markdown("### 📋 Details")
+    with col_left:
+        # Status Distribution Chart
+        status_chart = create_status_chart(df)
+        st.plotly_chart(status_chart, use_container_width=True, config={'displayModeBar': False})
+        
+        # Urgency Chart
+        urgency_chart = create_urgency_chart(df)
+        st.plotly_chart(urgency_chart, use_container_width=True, config={'displayModeBar': False})
     
-    # Filters in a single row
-    filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
-    with filter_col1:
-        status_filter = st.multiselect("Status", ['OK', 'Pending', 'NG'], default=['OK', 'Pending', 'NG'], label_visibility="collapsed", placeholder="Status")
-    with filter_col2:
-        urgency_filter = st.selectbox("Urgency", ['All', 'Overdue', 'Urgent (≤3)', 'Due Soon (4-7)', 'On Track'], label_visibility="collapsed")
-    with filter_col3:
-        search_model = st.text_input("🔍", placeholder="Search Model...", label_visibility="collapsed")
-    with filter_col4:
-        sort_by = st.selectbox("Sort", ['Days Left', 'Validation Date', 'Revalidation Due', 'Model'], label_visibility="collapsed")
-    
-    # Apply filters
-    filtered_df = df[df['Staus'].isin(status_filter)]
-    if urgency_filter == 'Overdue':
-        filtered_df = filtered_df[filtered_df['Days Left'] < 0]
-    elif urgency_filter == 'Urgent (≤3)':
-        filtered_df = filtered_df[(filtered_df['Days Left'] <= 3) & (filtered_df['Days Left'] >= 0)]
-    elif urgency_filter == 'Due Soon (4-7)':
-        filtered_df = filtered_df[(filtered_df['Days Left'] <= 7) & (filtered_df['Days Left'] > 3)]
-    elif urgency_filter == 'On Track':
-        filtered_df = filtered_df[filtered_df['Days Left'] > 7]
-    
-    if search_model:
-        filtered_df = filtered_df[filtered_df['Model'].str.contains(search_model, case=False, na=False)]
-    if sort_by in filtered_df.columns:
-        filtered_df = filtered_df.sort_values(sort_by, ascending=True)
-    
-    # Display compact table
-    display_cols = ['Model', 'Validation Date Display', 'Revalidation Due Display', 'Days Left', 'Staus', 'Incharge', 'Alert Status']
-    display_df = filtered_df[[c for c in display_cols if c in filtered_df.columns]].copy().fillna('-')
-    display_df['Days Left'] = display_df['Days Left'].apply(lambda x: f"{int(x)}d" if x != '-' and pd.notna(x) else '-')
-    
-    st.dataframe(display_df, use_container_width=True, height=400)
-    
-    # ── Compact Controls ─────────────────────────────────────
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        if st.button("📥 Export CSV", use_container_width=True):
-            csv = display_df.to_csv(index=False)
-            st.download_button("Download", csv, f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", "text/csv", key="dl")
-    with col2:
-        if st.button("📧 Send Alert Now", use_container_width=True):
-            with st.spinner("Sending..."):
-                success, msg = send_email_alert(df, st.session_state.primary_recipient, st.session_state.cc_recipients)
-                st.success(msg) if success else st.error(msg)
-    with col3:
-        if st.button("🔄 Refresh", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    with col4:
-        with st.expander("⚙️ Settings"):
-            st.text_input("TO:", value=st.session_state.primary_recipient, key="to_email")
-            st.text_area("CC:", value="\n".join(st.session_state.cc_recipients), height=80, key="cc_emails")
-            if st.button("Update Recipients"):
-                st.session_state.primary_recipient = st.session_state.to_email
-                st.session_state.cc_recipients = [e.strip() for e in st.session_state.cc_emails.split("\n") if e.strip()]
-                st.success("Recipients updated!")
-    
-    # Auto-refresh
-    if st.checkbox("Auto-refresh", value=True):
-        time.sleep(30)
-        st.rerun()
+    with col_right:
+        st.markdown("### 📋 Golden Sample Details")
+        
+        # Filters in a single row
+        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
+        with filter_col1:
+            status_filter = st.multiselect(
+                "Status", 
+                options=['OK', 'Pending', 'NG'], 
+                default=['OK', 'Pending', 'NG'],
+                key="status_filter"
+            )
+        with filter_col2:
+            urgency_filter = st.selectbox(
+                "Urgency",
+                options=['All', 'Overdue', 'Urgent (≤3 days)', 'Due Soon (4-7 days)', 'On Track (>7 days)'],
+                key="urgency_filter"
+            )
+        with filter_col3:
+            search_model = st.text_input("🔍 Search Model", placeholder="Enter model name...", key="search_model")
+        with filter_col4:
+            sort_by = st.selectbox(
+                "Sort by",
+                options=['Days Left', 'Validation Date', 'Revalidation Due', 'Model'],
+                key="sort_by"
+            )
+        
+        # Apply filters
+        filtered_df = df[df['Staus'].isin(status_filter)]
+        
+        # Apply urgency filter
+        if urgency_filter == 'Overdue':
+            filtered_df = filtered_df[filtered_df['Days Left'] < 0]
+        elif urgency_filter == 'Urgent (≤3 days)':
+            filtered_df = filtered_df[(filtered_df['Days Left'] <= 3) & (filtered_df['Days Left'] >= 0)]
+        elif urgency_filter == 'Due Soon (4-7 days)':
+            filtered_df = filtered_df[(filtered_df['Days Left'] <= 7) & (filtered_df['Days Left'] > 3)]
+        elif urgency_filter == 'On Track (>7 days)':
+            filtered_df = filtered_df[filtered_df['Days Left'] > 7]
+        
+        if search_model:
+            filtered_df = filtered_df[filtered_df['Model'].str.contains(search_model, case=False, na=False)]
+        
+        # Sort
+        if sort_by in filtered_df.columns:
+            if sort_by == 'Days Left':
+                filtered_df = filtered_df.sort_values(sort_by, ascending=True)
+            else:
+                filtered_df = filtered_df.sort_values(sort_by, ascending=True)
+        
+        # Remove blank rows (rows with missing critical data)
+        filtered_df = filtered_df.dropna(subset=['Model', 'Staus'])
+        filtered_df = filtered_df[filtered_df['Model'] != '']
+        filtered_df = filtered_df[filtered_df['Staus'] != '']
+        
+        # Display table
+        display_cols = ['Model', 'Validation Date Display', 'Revalidation Due Display', 
+                        'Days Left', 'Staus', 'Incharge', 'Alert Status']
+        
+        available_cols = [col for col in display_cols if col in filtered_df.columns]
+        display_df = filtered_df[available_cols].copy()
+        display_df = display_df.fillna('-')
+        
+        # Format Days Left
+        display_df['Days Left'] = display_df['Days Left'].apply(
+            lambda x: f"{int(x)} days" if x != '-' and pd.notna(x) and x != '-' else '-'
+        )
+        
+        # Color code rows
+        def highlight_row(row):
+            if 'Days Left' in row and row['Days Left'] != '-':
+                try:
+                    days = int(row['Days Left'].split()[0])
+                    if days < 0:
+                        return ['background-color: #f8d7da'] * len(row)
+                    elif days <= 3:
+                        return ['background-color: #fff3cd'] * len(row)
+                except:
+                    pass
+            return [''] * len(row)
+        
+        styled_df = display_df.style.apply(highlight_row, axis=1)
+        
+        st.dataframe(styled_df, use_container_width=True, height=450)
+        
+        # Action buttons
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            if st.button("📥 Export CSV", use_container_width=True):
+                csv = display_df.to_csv(index=False)
+                st.download_button(
+                    "Download",
+                    csv,
+                    f"golden_sample_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    "text/csv",
+                    key="download_btn"
+                )
+        with col2:
+            if st.button("📧 Send Alert Now", use_container_width=True):
+                with st.spinner("Sending alert..."):
+                    success, msg = send_email_alert(df, st.session_state.primary_recipient, st.session_state.cc_recipients)
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+        with col3:
+            if st.button("🔄 Refresh Data", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+        with col4:
+            with st.expander("⚙️ Settings"):
+                st.text_input("TO Email:", value=st.session_state.primary_recipient, key="to_email_setting")
+                st.text_area("CC Emails:", value="\n".join(st.session_state.cc_recipients), height=100, key="cc_setting")
+                if st.button("Update Recipients"):
+                    st.session_state.primary_recipient = st.session_state.to_email_setting
+                    st.session_state.cc_recipients = [e.strip() for e in st.session_state.cc_setting.split("\n") if e.strip()]
+                    st.success("Recipients updated!")
 
 if __name__ == "__main__":
     main()
