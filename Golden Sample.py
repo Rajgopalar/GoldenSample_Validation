@@ -213,7 +213,10 @@ def parse_date_safe(date_str):
 @st.cache_data(ttl=300)
 def fetch_data():
     try:
-        return pd.read_csv(CSV_URL)
+        df = pd.read_csv(CSV_URL)
+        # Clean column names
+        df.columns = df.columns.str.strip()
+        return df
     except Exception as e:
         st.error(f"Error fetching data: {e}")
         return None
@@ -225,12 +228,18 @@ def process_data(df):
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    for col in ['Validation Date', 'Staus', 'Model']:
+    # Check required columns
+    required_cols = ['Validation Date', 'Staus', 'Model']
+    for col in required_cols:
         if col not in df.columns:
+            st.error(f"Missing column: {col}")
+            st.write("Available columns:", df.columns.tolist())
             return None
 
+    # Parse dates
     df['Validation Date Parsed'] = df['Validation Date'].apply(parse_date_safe)
     df = df.dropna(subset=['Validation Date Parsed'])
+    
     if df.empty:
         return None
 
@@ -246,7 +255,8 @@ def process_data(df):
 
     def get_alert_status(row):
         d = row['Days Left']
-        s = str(row.get('Staus', '')).lower()
+        s = str(row.get('Staus', '')).lower().strip()
+        
         if pd.isna(d):
             return '⚪ Unknown'
         if s == 'ok':
@@ -261,10 +271,13 @@ def process_data(df):
 
     df['Alert Status'] = df.apply(get_alert_status, axis=1)
     
-    # Clean data - remove rows with empty Model or Status
+    # Clean data - keep ALL rows with valid Model and Status
     df = df.dropna(subset=['Model', 'Staus'])
     df = df[df['Model'].astype(str).str.strip() != '']
     df = df[df['Staus'].astype(str).str.strip() != '']
+    
+    # Standardize status values for consistency
+    df['Staus'] = df['Staus'].astype(str).str.strip().str.capitalize()
     
     return df
 
@@ -371,9 +384,9 @@ def generate_email_html(due_records, overdue_records):
         • {len(overdue_records)} OVERDUE &nbsp;• {len(due_records)} due within 3 days
     </div>
     <h3>🔴 OVERDUE SAMPLES:</h3>
-    <table><thead>{headers}</thead><tbody>{over_rows}</tbody></table>
+    {headers}{over_rows}</tbody></table>
     <h3>⚠️ SAMPLES DUE WITHIN 3 DAYS:</h3>
-    <table><thead>{headers}</thead><tbody>{due_rows}</tbody></table>
+    {headers}{due_rows}</tbody></table>
     <div class="footer">
         <p><i>Automated alert – Golden Sample Tracker System</i><br>Generated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}</p>
     </div>
@@ -407,19 +420,30 @@ def check_and_send_auto_email(df):
 
 
 # ─────────────────────────────────────────────────────────────
-#  CHARTS (Compressed)
+#  CHARTS
 # ─────────────────────────────────────────────────────────────
 
 def create_status_chart(df):
     counts = df['Staus'].value_counts()
     
-    # Colors: Dark Red for NG, Green for OK, Orange for Pending
+    # Colors: Green for OK, Orange for Pending, Dark Red for NG
     color_map = {
-        'OK': '#28a745',      # Green
+        'Ok': '#28a745',      # Green
+        'Ok': '#28a745',
         'Pending': '#fd7e14', # Orange
         'NG': '#8B0000'       # Dark Red
     }
-    colors = [color_map.get(status, '#6c757d') for status in counts.index]
+    
+    colors = []
+    for status in counts.index:
+        if status.lower() == 'ok':
+            colors.append('#28a745')
+        elif status.lower() == 'pending':
+            colors.append('#fd7e14')
+        elif status.lower() == 'ng':
+            colors.append('#8B0000')
+        else:
+            colors.append('#6c757d')
     
     fig = go.Figure(data=[go.Pie(
         labels=counts.index,
@@ -503,7 +527,7 @@ def create_urgency_chart(df):
 
 
 # ─────────────────────────────────────────────────────────────
-#  MAIN (Compressed Layout)
+#  MAIN
 # ─────────────────────────────────────────────────────────────
 
 def main():
@@ -562,13 +586,13 @@ def main():
     with col_right:
         st.markdown("### 📋 Golden Sample Details")
         
-        # Compact Filters Row (No Sort option)
+        # Compact Filters Row
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             status_filter = st.multiselect(
                 "Status", 
-                options=['OK', 'Pending', 'NG'], 
-                default=['OK', 'Pending', 'NG'],
+                options=['Ok', 'Pending', 'NG'], 
+                default=['Ok', 'Pending', 'NG'],
                 key="status_filter"
             )
         with col_f2:
@@ -580,7 +604,7 @@ def main():
         with col_f3:
             search_model = st.text_input("🔍 Search Model", placeholder="Enter model name...", key="search_model")
         
-        # Apply filters
+        # Apply filters - ensure OK data is included
         filtered_df = df[df['Staus'].isin(status_filter)]
         
         # Apply urgency filter
@@ -596,7 +620,7 @@ def main():
         if search_model:
             filtered_df = filtered_df[filtered_df['Model'].str.contains(search_model, case=False, na=False)]
         
-        # Remove any remaining blank rows
+        # Remove any blank rows - ensure all rows have data
         filtered_df = filtered_df.dropna(subset=['Model', 'Staus'])
         filtered_df = filtered_df[filtered_df['Model'].astype(str).str.strip() != '']
         filtered_df = filtered_df[filtered_df['Staus'].astype(str).str.strip() != '']
@@ -614,14 +638,14 @@ def main():
             lambda x: f"{int(x)}d" if x != '-' and pd.notna(x) and x != '-' else '-'
         )
         
-        # Color function for status - Dark Red for NG, Green for OK, Orange for Pending
+        # Color function for status - Green for OK, Orange for Pending, Dark Red for NG
         def color_status(val):
-            if val in ['OK', 'Ok', 'ok']:
-                return 'background-color: #28a745; color: white; font-weight: bold'
-            elif val in ['Pending', 'pending']:
-                return 'background-color: #fd7e14; color: white; font-weight: bold'
-            elif val in ['NG', 'Ng', 'ng']:
-                return 'background-color: #8B0000; color: white; font-weight: bold'
+            if val.lower() == 'ok':
+                return 'background-color: #28a745; color: white; font-weight: bold; text-align: center'
+            elif val.lower() == 'pending':
+                return 'background-color: #fd7e14; color: white; font-weight: bold; text-align: center'
+            elif val.lower() == 'ng':
+                return 'background-color: #8B0000; color: white; font-weight: bold; text-align: center'
             return ''
         
         # Apply styling
@@ -633,9 +657,9 @@ def main():
                 try:
                     days = int(str(val).replace('d', ''))
                     if days < 0:
-                        return 'background-color: #8B0000; color: white; font-weight: bold'
+                        return 'background-color: #8B0000; color: white; font-weight: bold; text-align: center'
                     elif days <= 3:
-                        return 'background-color: #fd7e14; color: white; font-weight: bold'
+                        return 'background-color: #fd7e14; color: white; font-weight: bold; text-align: center'
                 except:
                     pass
             return ''
