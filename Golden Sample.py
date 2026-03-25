@@ -30,9 +30,9 @@ CC_RECIPIENTS = [
 
 # Auto email settings
 AUTO_EMAIL_HOUR = 9
-AUTO_EMAIL_MINUTE = 00
+AUTO_EMAIL_MINUTE = 23
 # Fires if current time is within +/- this many minutes of target (handles restarts)
-AUTO_EMAIL_WINDOW_MINUTES = 10
+AUTO_EMAIL_WINDOW_MINUTES = 1
 AUTO_EMAIL_ENABLED = True
 
 # Persistent state file — survives thread/process restarts on Streamlit Cloud
