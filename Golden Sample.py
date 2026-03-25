@@ -422,15 +422,15 @@ def check_and_send_auto_email(df):
 # ─────────────────────────────────────────────────────────────
 
 def create_status_chart(df):
+    if df.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="No data available", x=0.5, y=0.5, showarrow=False)
+        fig.update_layout(height=280, margin=dict(l=10, r=10, t=40, b=10))
+        return fig
+    
     counts = df['Staus'].value_counts()
     
     # Colors for chart - bright and clear
-    color_map = {
-        'Ok': '#28a745',      # Green
-        'Pending': '#fd7e14', # Orange
-        'Ng': '#dc3545'       # Red
-    }
-    
     colors = []
     for status in counts.index:
         if status.lower() == 'ok':
@@ -443,21 +443,20 @@ def create_status_chart(df):
             colors.append('#6c757d')
     
     fig = go.Figure(data=[go.Pie(
-        labels=counts.index,
-        values=counts.values,
+        labels=counts.index.tolist(),
+        values=counts.values.tolist(),
         hole=0.5,
         marker_colors=colors,
         textinfo='label+percent',
         textposition='outside',
-        textfont=dict(family='Arial Narrow', size=12, weight='bold'),
-        insidetextfont=dict(size=12, weight='bold'),
-        showlegend=True,
-        legend=dict(font=dict(family='Arial Narrow', size=10))
+        textfont=dict(family='Arial Narrow', size=12)
     )])
     
     fig.update_layout(
-        title=dict(text="Status Distribution", font=dict(family='Arial Narrow', size=14, weight='bold')),
+        title=dict(text="Status Distribution", font=dict(family='Arial Narrow', size=14)),
         height=280,
+        showlegend=True,
+        legend=dict(font=dict(family='Arial Narrow', size=10)),
         margin=dict(l=10, r=10, t=40, b=10)
     )
     return fig
@@ -472,7 +471,7 @@ def create_urgency_chart(df):
         fig.add_annotation(text="No pending samples", x=0.5, y=0.5, showarrow=False,
                           font=dict(family='Arial Narrow', size=12))
         fig.update_layout(
-            title=dict(text="Samples by Urgency", font=dict(family='Arial Narrow', size=14, weight='bold')),
+            title=dict(text="Samples by Urgency", font=dict(family='Arial Narrow', size=14)),
             height=280,
             margin=dict(l=10, r=10, t=40, b=10)
         )
@@ -494,28 +493,28 @@ def create_urgency_chart(df):
     
     # Colors for urgency chart
     color_map = {
-        'Overdue': '#dc3545',      # Red
-        'Urgent (0-3)': '#fd7e14', # Orange
-        'Due Soon (4-7)': '#17a2b8', # Blue
-        'On Track': '#28a745',     # Green
+        'Overdue': '#dc3545',
+        'Urgent (0-3)': '#fd7e14',
+        'Due Soon (4-7)': '#17a2b8',
+        'On Track': '#28a745',
         'Unknown': '#6c757d'
     }
     
     colors = [color_map.get(cat, '#6c757d') for cat in counts.index]
     
     fig = go.Figure(data=[go.Bar(
-        x=counts.index,
-        y=counts.values,
+        x=counts.index.tolist(),
+        y=counts.values.tolist(),
         marker_color=colors,
-        text=counts.values,
+        text=counts.values.tolist(),
         textposition='auto',
-        textfont=dict(family='Arial Narrow', size=12, weight='bold')
+        textfont=dict(family='Arial Narrow', size=12)
     )])
     
     fig.update_layout(
-        title=dict(text="Samples by Urgency", font=dict(family='Arial Narrow', size=14, weight='bold')),
+        title=dict(text="Samples by Urgency", font=dict(family='Arial Narrow', size=14)),
         xaxis=dict(title="", tickfont=dict(family='Arial Narrow', size=11)),
-        yaxis=dict(title="Count", title_font=dict(family='Arial Narrow', size=11, weight='bold'), 
+        yaxis=dict(title="Count", title_font=dict(family='Arial Narrow', size=11), 
                    tickfont=dict(family='Arial Narrow', size=11)),
         height=280,
         showlegend=False,
