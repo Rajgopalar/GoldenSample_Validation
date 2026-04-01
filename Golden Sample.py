@@ -262,7 +262,7 @@ def process_data(df):
         return None
 
     validation_dates = pd.Series(df['Validation Date Parsed'])
-    revalidation_dates = validation_dates + pd.Timedelta(days=10)
+    revalidation_dates = validation_dates + pd.Timedelta(days=45)
     today = datetime.now().date()
 
     df['Days Left'] = [
